@@ -1,0 +1,792 @@
+---
+title: "Sentiment Application"
+author:  "Chris Bailey"
+date: '`r Sys.Date()`'
+output: 
+  flexdashboard::flex_dashboard:
+    theme: cosmo
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+resource:
+  - consolidatedBrandFile.csv
+  - loughran.csv
+  - afinn_111.xlsx
+---
+
+```{r, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(shinythemes)
+library(openintro)
+library(highcharter)
+library(knitr)
+library(lubridate) 
+library(scales) 
+library(tidytext) 
+library(tidyverse)
+library(broom) 
+library(textdata)
+library(plotly)
+library(wordcloud)
+library(RColorBrewer)
+library(reshape2) 
+library(ggraph)
+library(igraph)
+library(plotly)
+library(gtrendsR)
+library(reshape2)
+
+theme_set(theme_light())
+```
+
+```{r, include=FALSE }
+review <- readr::read_csv('consolidatedBrandFile.csv') %>%
+  mutate(week = as.Date(floor_date(date, "week", week_start = 1)))
+
+loughran_data <- readr::read_csv('loughran.csv')
+
+afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
+
+review$date <- as.Date(review$date)
+# C:\\Users\\cbail\\Desktop\\DataFiles\\patriot_sent\\SentimentApplication\\
+```
+
+```{r, include=FALSE}
+mycolors <- c("blue", "#FFC125", "darkgreen", "darkorange")
+```
+
+```{r, include=FALSE}
+review_copy <- review %>% 
+  filter(brand %in% c("Wave","Comcast","Frontier","Clink")) %>%
+  filter(region=="WaveNorth") %>%
+  filter(as.Date(date)>= "2010-08-24")
+
+#library(textclean)
+
+#review_copy$review <- review_copy$review %>% replace_emoji(review, emoji_dt = lexicon::hash_emojis)
+
+replace_reg1 <- "https://t.co/[A-Za-z\\d]+|" 
+replace_reg2 <- "http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https+|" 
+replace_reg <- paste0(replace_reg1, replace_reg2) 
+unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
+remove_words <- c("assess",
+                  "https",
+                  "amp",
+                  "comcast",
+                  "wave",
+                  "frontier",
+                  "centurylink",
+                  "century",
+                  "link",
+                  "xfinity",
+                  "broadband",
+                  "cable",
+                  "seattle",
+                  "fios",
+                  "ms",
+                  "wa",
+                  "ne",
+                  "ca",
+                  "don",
+                  "eta",
+                  "road",
+                  "ve",
+                  "pm",
+                  "ave",
+                  "ll",
+                  "expeditiously",
+                  "9d",
+                  "c2",
+                  "a0",
+                  "e2",
+                  "99",
+                  "80",
+                  "9c",
+                  "f0",
+                  "9f",
+                  "8f",
+                  "bb",
+                  "wi",
+                  "fi",
+                  "west",
+                  "sacramento",
+                  "wpmoychallenge",
+                  "wagner",
+                  "#wavety",
+                  "wave", 
+                  "havve", 
+                  "waveconnects", 
+                  "it's", 
+                  "gowave_g", 
+                  "ms", 
+                  "2b50", 
+                  "wa", 
+                  "2019th", 
+                  "back.baby", 
+                  "10am",
+                  "april.comcast", 
+                  "poc", 
+                  "@jcw091683", 
+                  "nick",
+                  "banks", 
+                  "fe0f", 
+                  "@brandonlundh", 
+                  "https",
+                  "0001f44e", 
+                  "bb.as11404", 
+                  "label",
+                  "9d",
+                  "c2",
+                  "a0",
+                  "e2",
+                  "99",
+                  "80",
+                  "9c",
+                  "f0",
+                  "9f",
+                  "8f",
+                  "bb",
+                  "wi",
+                  "fi",
+                  "@waveconnects",
+                  "@gowave_g",
+                  "net",
+                  "@centurylink",
+                  "as11404",
+                  "carnation",
+                  "ford",
+                  "oakland",
+                  "msn",
+                  "dm",
+                  "ntwk",
+                  "sonic",
+                  "@att",
+                  "seabeck",
+                  "ray",
+                  "ve",
+                  "don",
+                  "c3",
+                  "@comcast",
+                  "sa",
+                  "fu",
+                  "rcn",
+                  "kenneth",
+                  "auburn",
+                  "@kiro7seattle",
+                  "24x7",
+                  "@angular",
+                  "greenlake",
+                  "october",
+                  "hill",
+                  "0001f62c",
+                  "avenue",
+                  "0001f62b",
+                  "cert",
+                  "slu",
+                  "chris",
+                  "2019the",
+                  "zip",
+                  "@abcnetwork",
+                  "@mosea98",
+                  "@xfinity",
+                  "boyfriend",
+                  "generic",
+                  "@jasonrantz",
+                  "fargo",
+                  "0001f643",
+                  "3abn",
+                  "bahrain",
+                  "#wavety",
+                  "smarts",
+                  "port",
+                  "orchard",
+                  "molalla",
+                  "dan",
+                  "jessica",
+                  "274th",
+                  "0001f380",
+                  "@bjoran_identity",
+                  "sequim",
+                  "@dmkravets",
+                  "@king5seattle",
+                  "@komonews",
+                  "10k",
+                  "cr1",
+                  "@bjaminstein",
+                  "@paulstorms",
+                  "@abc",
+                  "0001f611",
+                  "@nyt",
+                  "@vrapolinario",
+                  "@pressreset",
+                  "@cutthecord",
+                  "gabe",
+                  "@nytimes",
+                  "@yanghubpug",
+                  "@periclesrocha",
+                  "@brianmkearns",
+                  "tony",
+                  "@comcastcares",
+                  "@fcc",
+                  "@downdetector",
+                  "@sukhbanwait",
+                  "sac"
+                  )
+  
+tidy_tweets <- review_copy %>%
+  #filter(src=="FaceBook") %>%
+  filter(!str_detect(review, "^RT")) %>% 
+  mutate(text = str_replace_all(review, replace_reg, "")) %>% 
+  unnest_tokens(word, review, token = "regex", pattern = unnest_reg) %>% 
+  filter(!word %in% stop_words$word,
+         !word %in% remove_words,
+         str_detect(word, "[a-z]"))
+```
+
+Data {data-icon="fa-database"}
+==================================================
+
+Row
+--------------------------------------------------
+
+### <font size="5">**Social Media Reviews by Brand**</font>
+```{r}
+p1 <- review_copy %>%
+  group_by(brand) %>%
+  summarise(units = n()) %>%
+  plot_ly(labels = ~brand,
+          values = ~units,
+          marker = list(colors = mycolors)) %>%
+  add_pie(hole = 0.4) %>%
+  layout(xaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F),
+         yaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F))
+p1
+```
+
+```{r, include=FALSE}
+review_ts_chart <- review_copy %>%
+  select(date, review, week, brand, region, src) %>%
+  arrange(desc(as.Date(date)))
+```
+
+### <font size="5">**Social Media Reviews by Week**</font>
+```{r}
+review_ts_chart %>%
+  arrange(desc(as.Date(date))) %>%
+  select(review, date, brand) %>%
+  group_by(date, brand) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(date, count, brand, fill = factor(brand), color=brand)) +
+  geom_line(size = 1) +
+  facet_wrap(~ brand, scales = "free") +
+  expand_limits(y=0) +
+  #scale_y_continuous(limits = c(0,100)) +
+  labs(title = "Count of Reviews by Week and Brand", 
+          y = "Review count",
+          x = "Week",
+       subtitle = "Includes reviews sourced from Yelp, FaceBook, and Twitter") +
+  theme(strip.background = element_rect(fill = "blue"), 
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.position = "none",
+        plot.title.position = "plot")
+```
+
+Topics {data-icon="fa-bullhorn"}
+==================================================
+
+Row
+--------------------------------------------------
+
+### <font size="5">**Wave Broadband Key Topic Analysis**</font>
+```{r}
+library(ggrepel)
+library(grid)
+
+wave_top_word <- tidy_tweets %>%
+  filter(brand == "Wave") %>%
+  filter(date>= "2020-01-01") %>%
+  count(word, week) %>%
+  bind_tf_idf(word, week, n) %>%
+  arrange(desc(tf_idf)) %>%
+  group_by(week) %>%
+  #top_n(1, tf_idf) %>% 
+  distinct(week, .keep_all = TRUE) %>%
+  arrange(week)
+
+wave_top_word %>%
+  ggplot(aes(week, n)) +
+  geom_line(color = "royalblue", size = 1.5) +
+  geom_point(color = "royalblue", size = 2) +
+  geom_text_repel(aes(label = word, color = word)) +
+  expand_limits(y = 0) +
+  labs(title = "Most common words by week: Wave", 
+          y = "Word count",
+          x = "Word") +
+  theme(legend.position = "none")
+```
+
+
+Word Trends {data-icon="fa-chart-line"}
+==================================================
+  
+Row
+--------------------------------------------------
+  
+### <font size="5">**Wave Broadband Key Trending Topics**</font>
+```{r}
+# rolling_dt <- today() - months(3) #lubridate
+
+words_by_time <- tidy_tweets %>%
+  filter(brand=="Wave") %>%
+  filter(!str_detect(word, "^@")) %>%
+  filter(date> "2020-01-01") %>%
+  mutate(time_floor = floor_date(date, unit = "week")) %>% 
+  count(time_floor, word) %>% 
+  # count(time_floor, period, word) %>% 
+  ungroup() %>% 
+  group_by(time_floor) %>%
+  # group_by(period, time_floor) %>% 
+  mutate(time_total = sum(n)) %>% 
+  group_by(word) %>% 
+  mutate(word_total = sum(n)) %>% 
+  ungroup() %>% 
+  rename(count = n) %>% 
+  filter(word_total>10)  # nbr of words used at least x times
+
+nested_data <- words_by_time %>%
+  # nest(-word,-time_floor)
+  nest_legacy(-word)
+
+nested_models <- nested_data %>%
+  mutate(models = map(data, ~glm(cbind(count, time_total) ~ time_floor, ., family = "binomial")))
+
+slopes <- nested_models %>%
+  unnest_legacy(map(models, tidy)) %>%
+  filter(term == "time_floor") %>%
+  mutate(adjusted.p.value = p.adjust(p.value))
+
+top_slopes <- slopes %>%
+  filter(adjusted.p.value<=0.5) %>%
+  select(-statistic,-p.value)
+
+# Which words' frequencies have changed the fastest over time?
+viz <- words_by_time %>%
+  inner_join(top_slopes, by = c("word")) %>%
+  ggplot(aes(time_floor,
+             count/time_total,
+             color = word,
+             lty = word)) +
+  geom_line(stat = "identity", size = 1.0) +
+  # geom_text(aes(label=word)) +
+  labs(x = NULL, y = "Word frequency") +
+  #scale_x_date(labels = date_format("%m-%Y")) +
+  #scale_x_date(date_breaks = "1 month", date_labels =  "%m-%Y") +
+  #scale_x_date(date_breaks = "1 month", date_labels =  "%m-%e-%Y") +
+  scale_x_date(date_breaks = "1 week", date_labels =  "%b %d") +
+  theme(text = element_text(size=12),
+        axis.text.x=element_text(angle=60, hjust=1),
+        legend.text = element_text(size=rel(1)),
+        legend.key.width = unit(1.5, "cm"))
+ggplotly(viz)
+```
+
+
+Word Ratios {data-icon="fa-chart-bar"}
+==================================================
+
+Row
+------------------------------------------------------------
+  
+### <font size="5">**Word Ratios: Wave v Comcast**</font>
+```{r}
+word_ratios <- tidy_tweets %>%
+  filter(brand %in% c("Wave","Comcast")) %>%
+  filter(!str_detect(word, "^@")) %>%
+  count(word, brand) %>%
+  group_by(word) %>%
+  filter(sum(n) >= 10) %>%
+  ungroup() %>%
+  spread(brand, n, fill = 0) %>%
+  mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
+  mutate(logratio = log(Wave/Comcast)) %>%
+  arrange(desc(logratio))
+
+grande_spectrum_word_ratios <- word_ratios %>% 
+  arrange(abs(logratio))
+
+wr_1 <- grande_spectrum_word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(16, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=20), legend.position = "none") +
+  coord_flip() +
+  ylab("log odds ratio (Comcast/Wave)") +
+  scale_fill_discrete(name = "", labels = c("Comcast", "Wave")) 
+ggplotly(wr_1)
+```
+
+### <font size="5">**Word Ratios: Wave v Frontier**</font>
+```{r}
+word_ratios <- tidy_tweets %>%
+  filter(brand %in% c("Wave","Frontier")) %>%
+  filter(!str_detect(word, "^@")) %>%
+  count(word, brand) %>%
+  group_by(word) %>%
+  filter(sum(n) >= 10) %>%
+  ungroup() %>%
+  spread(brand, n, fill = 0) %>%
+  mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
+  mutate(logratio = log(Wave/Frontier)) %>%
+  arrange(desc(logratio))
+
+grande_att_word_ratios <- word_ratios %>% 
+  arrange(abs(logratio))
+
+wr_2 <- grande_att_word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(16, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=20), legend.position = "none") +
+  coord_flip() +
+  ylab("log odds ratio (Frontier/Wave)") +
+  scale_fill_discrete(name = "", labels = c("Frontier", "Wave"))
+ggplotly(wr_2)
+```
+
+### <font size="5">**Word Ratios: Wave v CenturyLink**</font>
+```{r}
+word_ratios <- tidy_tweets %>%
+  filter(brand %in% c("Wave","Clink")) %>%
+  filter(!str_detect(word, "^@")) %>%
+  count(word, brand) %>%
+  group_by(word) %>%
+  filter(sum(n) >= 10) %>%
+  ungroup() %>%
+  spread(brand, n, fill = 0) %>%
+  mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
+  mutate(logratio = log(Wave/Clink)) %>%
+  arrange(desc(logratio))
+
+grande_att_word_ratios <- word_ratios %>% 
+  arrange(abs(logratio))
+
+wr_3 <- grande_att_word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(16, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=20), legend.position = "none") +
+  coord_flip() +
+  ylab("log odds ratio (Clink/Wave)") +
+  scale_fill_discrete(name = "", labels = c("Clink", "Wave"))
+ggplotly(wr_3)
+```
+
+Sentiment Drivers {data-icon="fa-cloud"}
+==================================================
+  
+Row {data-height=450}
+--------------------------------------------------
+
+```{r, include=FALSE}
+my_lexicon <- afinn_111
+```
+
+### <font size="5">**Wave Sentiment Drivers**</font>
+```{r}
+contributions <- tidy_tweets %>% filter(brand=="Wave") %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(value))
+
+contributions %>%
+  top_n(16, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16)) +
+  coord_flip()
+```
+
+### <font size="5">**Comcast Sentiment Drivers**</font>
+```{r}
+contributions <- tidy_tweets %>% filter(brand=="Comcast") %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(value))
+
+contributions %>%
+  top_n(16, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16)) +
+  coord_flip()
+```
+
+### <font size="5">**Frontier Sentiment Drivers**</font>
+```{r}
+contributions <- tidy_tweets %>% filter(brand=="Frontier") %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(value))
+
+contributions %>%
+  top_n(16, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16)) +
+  coord_flip()
+```
+
+### <font size="5">**CenturyLink Sentiment Drivers**</font>
+```{r}
+contributions <- tidy_tweets %>% filter(brand=="Clink") %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(value))
+
+contributions %>%
+  top_n(16, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16)) +
+  coord_flip()
+```
+
+Row
+--------------------------------------------------------
+  
+```{r, include=FALSE}
+my_loughran <- loughran_data
+```
+
+### <font size="5">**Wave Sentiment Word Cloud**</font>
+```{r}
+par(mar=c(.5,1,1,.5))
+tidy_tweets %>%
+  filter(date>"2020-01-01") %>%
+  filter(brand=="Wave") %>%
+  inner_join(my_loughran) %>%
+  count(word, sentiment, sort = TRUE) %>% 
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>% 
+  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"), 
+                   colors = c("green", "orange", "red", "blue", "black"),
+                   title.bg.colors=c("grey90"),
+                   max.words = 50,
+                   title.size = 3) 
+par(las=0)
+```
+
+### <font size="5">**Comcast Sentiment Word Cloud**</font>
+```{r}
+par(mar=c(.5,1,1,.5))
+tidy_tweets %>%
+  filter(date>"2020-01-01") %>%
+  filter(brand=="Comcast") %>%
+  inner_join(my_loughran) %>%
+  count(word, sentiment, sort = TRUE) %>% 
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>% 
+  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"), 
+                   colors = c("green", "orange", "red", "blue", "black"),
+                   title.bg.colors=c("grey90"),
+                   max.words = 50,
+                   title.size = 3) 
+par(las=0)
+```
+
+### <font size="5">**Frontier Sentiment Word Cloud**</font>
+```{r}
+par(mar=c(.5,1,1,.5))
+tidy_tweets %>%
+  filter(date>"2020-01-01") %>%
+  filter(brand=="Frontier") %>%
+  inner_join(my_loughran) %>%
+  count(word, sentiment, sort = TRUE) %>% 
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>% 
+  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"), 
+                   colors = c("green", "orange", "red", "blue", "black"),
+                   title.bg.colors=c("grey90"),
+                   max.words = 50,
+                   title.size = 3) 
+par(las=0)
+```
+
+### <font size="5">**CenturyLink Sentiment Word Cloud**</font>
+```{r}
+par(mar=c(.5,1,1,.5))
+tidy_tweets %>%
+  filter(date>"2020-01-01") %>%
+  filter(brand=="Clink") %>%
+  inner_join(my_loughran) %>%
+  count(word, sentiment, sort = TRUE) %>% 
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>% 
+  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"), 
+                   colors = c("green", "orange", "red", "blue", "black"),
+                   title.bg.colors=c("grey90"),
+                   max.words = 100,
+                   title.size = 3) 
+par(las=0)
+```
+
+Sentiment Trend {data-icon="fa-smile-beam"}
+==================================================
+  
+Row {data-height=450}
+--------------------------------------------------
+
+### <font size="5">**Average Sentiment Score by Day**</font>
+```{r}
+sentiment_messages <- tidy_tweets %>% 
+  filter(brand %in% c("Wave","Comcast","Clink","Frontier")) %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(date, brand) %>%
+  summarize(sentiment = mean(value),
+            words = n()) %>%
+  ungroup() %>%
+  filter(words>=5)
+
+p2 <- sentiment_messages %>% 
+  group_by(date, brand) %>%
+  arrange(as.Date(date)) %>%
+  ggplot(aes(date, sentiment, fill = factor(brand), color=brand)) +
+  geom_line(show.legend = FALSE) +
+  geom_smooth() +
+  theme(legend.position = "none", text = element_text(size=12),
+        axis.text.x=element_text(angle=60, hjust=1),
+        legend.text = element_text(size=rel(1)),
+        legend.key.width = unit(1.5, "cm"),
+        axis.title.x=element_blank(),
+        strip.background = element_rect(fill = "blue"), 
+        strip.text = element_text(size = 14)) +
+  scale_x_date(date_breaks = "2 weeks") +
+  facet_wrap(~ brand, scales = "fixed")
+ggplotly(p2, tooltip = c("date","sentiment"), dynamicTicks = TRUE)
+```
+
+Wave Word Network {data-icon="fa-connectdevelop"}
+==================================================
+  
+Row
+--------------------------------------------------
+  
+### <font size="5">**Wave Word Network**</font>
+```{r, include=FALSE}
+# Visualizing nGrams
+austen_bigrams_grande <- review_copy %>%
+  filter(brand=="Wave") %>%
+  unnest_tokens(bigram, review, token = "ngrams", n = 2) 
+
+# Counting and filtering n-grams
+austen_bigrams_grande %>% 
+  count(bigram, sort = TRUE)
+
+bigrams_separated_grande <- austen_bigrams_grande %>%
+  separate(bigram, c("word1", "word2"), sep = " ") 
+
+bigrams_filtered_grande <- bigrams_separated_grande %>% 
+  filter(!word1 %in% stop_words$word) %>% 
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!word1 %in% remove_words) %>%
+  filter(!word2 %in% remove_words) %>%
+  filter(str_detect(word1, "[a-z]")) %>%
+  filter(str_detect(word2, "[a-z]"))
+  
+# new bigram counts: 
+bigram_counts_grande <- bigrams_filtered_grande %>% 
+  count(word1, word2, sort = TRUE)
+
+bigram_graph_grande <- bigram_counts_grande %>% 
+  filter(n>9) %>% 
+  graph_from_data_frame()
+```
+
+```{r}
+set.seed(2016) 
+par(mar=c(.1,.1,.1,.1))
+a <- grid::arrow(type = "closed", 
+                 length = unit(.1, "inches")) 
+ggraph(bigram_graph_grande, layout = "fr") + 
+  geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour="darkred") + 
+  geom_node_point(color = "lightblue", size = 6) + 
+  geom_node_text(aes(label = name), vjust = 1, hjust = 1, repel=TRUE, point.padding = unit(0.2, "lines")) + 
+  theme_void() 
+```
+
+Google Trends {data-icon="fa fa-google"}
+=====================================
+  
+Row
+-------------------------------------
+
+### <font size="5">**Google Interest Trends by Brand**</font>
+```{r}
+keywords=c("wave broadband", "centurylink", "comcast")
+country=c('US-WA')
+#time=("2019-01-01 2018-08-27")
+time='today 12-m'
+channel='web'
+
+trends = gtrends(keywords, gprop =channel,geo=country, time = time, onlyInterest = TRUE)
+
+time_trend=trends$interest_over_time
+
+plot <- ggplot(data=time_trend, aes(x=date, y=hits,group=keyword,col=keyword))+
+  geom_line()+xlab('Time')+ylab('Relative Interest')+ theme_bw()+
+  theme(legend.title = element_blank(),legend.position="bottom",legend.text=element_text(size=12))+ggtitle("Rolling 12-month Google Search Volume - Washington State")
+ggplotly(plot)
+```
+
+Recent Reviews {data-icon="far fa-comments"}
+==================================================
+
+```{r, include=FALSE}
+sentiment_messages_polarity <- tidy_tweets %>%
+  filter(date>=as.Date("2020-01-01")) %>%
+  filter(src != "FaceBook") %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(text, brand, date, src) %>%
+  summarize(sentiment = sum(value),
+            words = n()) %>%
+  ungroup() %>%
+  #filter(words>= 4) %>%
+  mutate(polarity = ifelse(sentiment>=4,"Very Positive",ifelse(sentiment>=1 & sentiment<4, "Positive", ifelse(sentiment<=(-1) & sentiment>=(-3), "Negative", ifelse(sentiment<(-3),"Very Negative","Neutral")))))
+
+#Very Negative (rating -5 or -4)
+#Negative (rating -3, -2, or -1)
+#Positive (rating 1, 2, or 3)
+#Very Positive (rating 4 or 5)
+```
+
+Row
+--------------------------------------------------
+
+### <font size="5">**Recent Social Media Reviews and Sentiment Polarity**</font>
+```{r}
+DT::datatable(sentiment_messages_polarity[,-c(5:6)],
+          caption = "Reviews by Sentiment Polarity",
+          rownames = T,
+          filter = "top",
+          options = list(pageLength=25))
+```
