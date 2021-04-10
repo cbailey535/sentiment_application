@@ -67,7 +67,7 @@ replace_reg1 <- "https://t.co/[A-Za-z\\d]+|"
 replace_reg2 <- "http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https+|" 
 replace_reg <- paste0(replace_reg1, replace_reg2) 
 unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
-# remove_words <- c("assess",
+remove_words <- c("hey")
 
 tidy_tweets <- review_copy %>%
   # filter(!str_detect(text, "^RT")) %>%
@@ -76,6 +76,7 @@ tidy_tweets <- review_copy %>%
   unnest_tokens(word, review, token = "regex", pattern = unnest_reg) %>%
   filter(!word %in% stop_words$word,
          !word %in% str_remove_all(stop_words$word, "'"),
+         !word %in% remove_words,
          str_detect(word, "[a-z]"))
 ```
 
@@ -105,6 +106,35 @@ p1 <- review_copy %>%
 p1
 ```
 
+### <font size="5">**Social Media Reviews by Week**</font>
+```{r}
+review_ts_chart <- review_copy %>%
+  select(created_at, review, week, brand, region, src) %>%
+  arrange(desc(as.Date(created_at)))
+
+review_ts_chart %>%
+  arrange(desc(as.Date(created_at))) %>%
+  select(review, created_at, brand) %>%
+  group_by(created_at, brand) %>%
+  summarize(count = n()) %>%
+  ggplot(aes(created_at, count, brand, fill = factor(brand), color=brand)) +
+  geom_line(size = 1) +
+  facet_wrap(~ brand, scales = "free") +
+  expand_limits(y=0) +
+  #scale_y_continuous(limits = c(0,100)) +
+  labs(title = "Count of Reviews by Week and Brand", 
+          y = "Review count",
+          x = "Week",
+       subtitle = "Includes reviews sourced from Yelp, FaceBook, and Twitter") +
+  theme(strip.background = element_rect(fill = "blue"), 
+        strip.text = element_text(size = 12, face = "bold"),
+        legend.position = "none",
+        plot.title.position = "plot")
+```
+
+Row
+--------------------------------------------------
+
 ### <font size="5">**Social Media Reviews by Region**</font>
 ```{r}
 p1 <- review_copy %>%
@@ -125,23 +155,20 @@ p1 <- review_copy %>%
 p1
 ```
 
-
-```{r, include=FALSE}
-review_ts_chart <- review_copy %>%
-  select(created_at, text, week, brand, region, src) %>%
-  arrange(desc(as.Date(created_at)))
-```
-
 ### <font size="5">**Social Media Reviews by Week**</font>
 ```{r}
+review_ts_chart <- review_copy %>%
+  select(created_at, review, week, brand, region, src) %>%
+  arrange(desc(as.Date(created_at)))
+
 review_ts_chart %>%
   arrange(desc(as.Date(created_at))) %>%
-  select(text, created_at, brand) %>%
-  group_by(created_at, brand) %>%
+  select(review, created_at, region) %>%
+  group_by(created_at, region) %>%
   summarize(count = n()) %>%
-  ggplot(aes(created_at, count, brand, fill = factor(brand), color=brand)) +
+  ggplot(aes(created_at, count, region, fill = factor(region), color=region)) +
   geom_line(size = 1) +
-  facet_wrap(~ brand, scales = "free") +
+  facet_wrap(~ region, scales = "free") +
   expand_limits(y=0) +
   #scale_y_continuous(limits = c(0,100)) +
   labs(title = "Count of Reviews by Week and Brand", 
@@ -163,7 +190,7 @@ Row
 ### <font size="5">**Wave Broadband Key Topic Analysis**</font>
 ```{r}
 wave_top_word <- tidy_tweets %>%
-  filter(brand == "ATT") %>%
+  filter(brand == "Wave") %>%
   # filter(date>= "2020-01-01") %>%
   count(word, week) %>%
   bind_tf_idf(word, week, n) %>%
@@ -185,7 +212,6 @@ wave_top_word %>%
   theme(legend.position = "none")
 ```
 
-
 Word Trends {data-icon="fa-chart-line"}
 ==================================================
   
@@ -197,7 +223,7 @@ Row
 # rolling_dt <- today() - months(3) #lubridate
 
 words_by_time <- tidy_tweets %>%
-  filter(brand=="ATT") %>%
+  filter(brand=="Wave") %>%
   # filter(!str_detect(word, "^@")) %>%
   # filter(date> "2020-01-01") %>%
   mutate(time_floor = floor_date(created_at, unit = "week")) %>% 
@@ -211,7 +237,7 @@ words_by_time <- tidy_tweets %>%
   mutate(word_total = sum(n)) %>% 
   ungroup() %>% 
   rename(count = n) %>% 
-  filter(word_total>5)  # nbr of words used at least x times
+  filter(word_total>10)  # nbr of words used at least x times
 
 nested_data <- words_by_time %>%
   # nest(-word,-time_floor)
@@ -226,7 +252,7 @@ slopes <- nested_models %>%
   mutate(adjusted.p.value = p.adjust(p.value))
 
 top_slopes <- slopes %>%
-  # filter(adjusted.p.value<=0.5) %>%
+  filter(adjusted.p.value<=0.1) %>%
   select(-statistic,-p.value)
 
 # Which words' frequencies have changed the fastest over time?
@@ -257,18 +283,18 @@ Word Ratios {data-icon="fa-chart-bar"}
 Row
 ------------------------------------------------------------
   
-### <font size="5">**Word Ratios: ATT v Xfinity**</font>
+### <font size="5">**Word Ratios: Wave v Xfinity**</font>
 ```{r}
 word_ratios <- tidy_tweets %>%
-  filter(brand %in% c("ATT","Xfinity")) %>%
-  filter(!str_detect(word, "^@")) %>%
+  filter(brand %in% c("Wave","Xfinity")) %>%
+  # filter(!str_detect(word, "^@")) %>%
   count(word, brand) %>%
   group_by(word) %>%
   filter(sum(n)>=5) %>%
   ungroup() %>%
   spread(brand, n, fill = 0) %>%
   mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
-  mutate(logratio = log(ATT/Xfinity)) %>%
+  mutate(logratio = log(Wave/Xfinity)) %>%
   arrange(desc(logratio))
 
 att_xfin_word_ratios <- word_ratios %>% 
@@ -283,23 +309,23 @@ wr_1 <- att_xfin_word_ratios %>%
   geom_col(show.legend = FALSE) +
   theme(text = element_text(size=20), legend.position = "none") +
   coord_flip() +
-  ylab("log odds ratio (Xfinity/ATT)") +
-  scale_fill_discrete(name = "", labels = c("Xfinity", "ATT")) 
+  ylab("log odds ratio (Xfinity/Wave)") +
+  scale_fill_discrete(name = "", labels = c("Xfinity", "Wave")) 
 ggplotly(wr_1)
 ```
 
-### <font size="5">**Word Ratios: ATT v Xfinity**</font>
+### <font size="5">**Word Ratios: Wave v CenturyLink**</font>
 ```{r}
 word_ratios <- tidy_tweets %>%
-  filter(brand %in% c("ATT","Xfinity")) %>%
-  filter(!str_detect(word, "^@")) %>%
+  filter(brand %in% c("Wave","CenturyLink")) %>%
+  # filter(!str_detect(word, "^@")) %>%
   count(word, brand) %>%
   group_by(word) %>%
   filter(sum(n)>=5) %>%
   ungroup() %>%
   spread(brand, n, fill = 0) %>%
   mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
-  mutate(logratio = log(ATT/Xfinity)) %>%
+  mutate(logratio = log(Wave/CenturyLink)) %>%
   arrange(desc(logratio))
 
 att_xfin_word_ratios <- word_ratios %>% 
@@ -314,23 +340,23 @@ wr_2 <- att_xfin_word_ratios %>%
   geom_col(show.legend = FALSE) +
   theme(text = element_text(size=20), legend.position = "none") +
   coord_flip() +
-  ylab("log odds ratio (Xfinity/ATT)") +
-  scale_fill_discrete(name = "", labels = c("Xfinity", "ATT")) 
+  ylab("log odds ratio (CenturyLink/Wave)") +
+  scale_fill_discrete(name = "", labels = c("CenturyLink", "Wave")) 
 ggplotly(wr_2)
 ```
 
-### <font size="5">**Word Ratios: ATT v Xfinity**</font>
+### <font size="5">**Word Ratios: Wave v ATT**</font>
 ```{r}
 word_ratios <- tidy_tweets %>%
-  filter(brand %in% c("ATT","Xfinity")) %>%
-  filter(!str_detect(word, "^@")) %>%
+  filter(brand %in% c("Wave","ATT")) %>%
+  # filter(!str_detect(word, "^@")) %>%
   count(word, brand) %>%
   group_by(word) %>%
   filter(sum(n)>=5) %>%
   ungroup() %>%
   spread(brand, n, fill = 0) %>%
   mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
-  mutate(logratio = log(ATT/Xfinity)) %>%
+  mutate(logratio = log(Wave/ATT)) %>%
   arrange(desc(logratio))
 
 att_xfin_word_ratios <- word_ratios %>% 
@@ -345,8 +371,8 @@ wr_3 <- att_xfin_word_ratios %>%
   geom_col(show.legend = FALSE) +
   theme(text = element_text(size=20), legend.position = "none") +
   coord_flip() +
-  ylab("log odds ratio (Xfinity/ATT)") +
-  scale_fill_discrete(name = "", labels = c("Xfinity", "ATT")) 
+  ylab("log odds ratio (ATT/Wave)") +
+  scale_fill_discrete(name = "", labels = c("ATT", "Wave")) 
 ggplotly(wr_3)
 ```
 
@@ -369,7 +395,7 @@ contributions <- tidy_tweets %>% filter(brand=="Wave") %>%
             contribution = sum(value))
 
 contributions %>%
-  top_n(16, abs(contribution)) %>%
+  top_n(10, abs(contribution)) %>%
   mutate(word = reorder(word, contribution)) %>%
   ggplot(aes(word, contribution, fill = contribution > 0)) +
   geom_col(show.legend = FALSE) +
@@ -377,7 +403,7 @@ contributions %>%
   coord_flip()
 ```
 
-### <font size="5">**Comcast Sentiment Drivers**</font>
+### <font size="5">**Xfinity Sentiment Drivers**</font>
 ```{r}
 contributions <- tidy_tweets %>% filter(brand=="Xfinity") %>%
   inner_join(my_lexicon, by = "word") %>%
@@ -386,7 +412,7 @@ contributions <- tidy_tweets %>% filter(brand=="Xfinity") %>%
             contribution = sum(value))
 
 contributions %>%
-  top_n(16, abs(contribution)) %>%
+  top_n(10, abs(contribution)) %>%
   mutate(word = reorder(word, contribution)) %>%
   ggplot(aes(word, contribution, fill = contribution > 0)) +
   geom_col(show.legend = FALSE) +
@@ -403,7 +429,7 @@ contributions <- tidy_tweets %>% filter(brand=="ATT") %>%
             contribution = sum(value))
 
 contributions %>%
-  top_n(16, abs(contribution)) %>%
+  top_n(10, abs(contribution)) %>%
   mutate(word = reorder(word, contribution)) %>%
   ggplot(aes(word, contribution, fill = contribution > 0)) +
   geom_col(show.legend = FALSE) +
@@ -420,7 +446,7 @@ contributions <- tidy_tweets %>% filter(brand=="CenturyLink") %>%
             contribution = sum(value))
 
 contributions %>%
-  top_n(16, abs(contribution)) %>%
+  top_n(10, abs(contribution)) %>%
   mutate(word = reorder(word, contribution)) %>%
   ggplot(aes(word, contribution, fill = contribution > 0)) +
   geom_col(show.legend = FALSE) +
@@ -442,17 +468,17 @@ tidy_tweets %>%
   # filter(date>"2020-01-01") %>%
   filter(brand=="Wave") %>%
   inner_join(my_loughran) %>%
-  count(word, sentiment, sort = TRUE) %>% 
-  acast(word ~ sentiment, value.var = "n", fill = 0) %>% 
-  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"), 
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"),
                    colors = c("green", "orange", "red", "blue", "black"),
                    title.bg.colors=c("grey90"),
                    max.words = 50,
-                   title.size = 3) 
+                   title.size = 3)
 par(las=0)
 ```
 
-### <font size="5">**Comcast Sentiment Word Cloud**</font>
+### <font size="5">**Xfinity Sentiment Word Cloud**</font>
 ```{r}
 par(mar=c(.5,1,1,.5))
 tidy_tweets %>%
@@ -469,7 +495,7 @@ tidy_tweets %>%
 par(las=0)
 ```
 
-### <font size="5">**Frontier Sentiment Word Cloud**</font>
+### <font size="5">**ATT Sentiment Word Cloud**</font>
 ```{r}
 par(mar=c(.5,1,1,.5))
 tidy_tweets %>%
@@ -533,7 +559,7 @@ p2 <- sentiment_messages %>%
         axis.title.x=element_blank(),
         strip.background = element_rect(fill = "blue"), 
         strip.text = element_text(size = 14)) +
-  scale_x_date(date_breaks = "2 weeks") +
+  scale_x_date(date_breaks = "1 weeks") +
   facet_wrap(~ brand, scales = "fixed")
 ggplotly(p2, tooltip = c("date","sentiment"), dynamicTicks = TRUE)
 ```
@@ -547,9 +573,9 @@ Row
 ### <font size="5">**Word Network**</font>
 ```{r, include=FALSE}
 # Visualizing nGrams
-austen_bigrams_grande <- review %>%
-  filter(brand=="Xfinity") %>%
-  unnest_tokens(bigram, text, token = "ngrams", n = 2) 
+austen_bigrams_grande <- review_copy %>%
+  filter(brand=="Wave") %>%
+  unnest_tokens(bigram, review, token = "ngrams", n = 2) 
 
 # Counting and filtering n-grams
 austen_bigrams_grande %>% 
@@ -564,14 +590,14 @@ bigrams_filtered_grande <- bigrams_separated_grande %>%
   filter(!word1 %in% remove_words) %>%
   filter(!word2 %in% remove_words) %>%
   filter(str_detect(word1, "[a-z]")) %>%
-  filter(str_detect(word2, "[a-z]"))
+  filter(str_detect(word2, "[a-z]")) 
   
 # new bigram counts: 
 bigram_counts_grande <- bigrams_filtered_grande %>% 
   count(word1, word2, sort = TRUE)
 
 bigram_graph_grande <- bigram_counts_grande %>% 
-  filter(n>25) %>% 
+  filter(n>10) %>% 
   graph_from_data_frame()
 ```
 
@@ -587,29 +613,100 @@ ggraph(bigram_graph_grande, layout = "fr") +
   theme_void() 
 ```
 
-Google Trends {data-icon="fa fa-google"}
-=====================================
-  
-Row
--------------------------------------
+<!-- Google Trends {data-icon="fa fa-google"} -->
+<!-- ===================================== -->
 
-### <font size="5">**Google Interest Trends by Brand**</font>
-```{r}
-keywords=c("wave broadband", "centurylink", "comcast")
-country=c('US-WA')
-#time=("2019-01-01 2018-08-27")
-time='today 12-m'
-channel='web'
+<!-- Row -->
+<!-- ------------------------------------- -->
 
-trends = gtrends(keywords, gprop =channel,geo=country, time = time, onlyInterest = TRUE)
+<!-- ### <font size="5">**Google Interest Trends by Brand: California**</font> -->
 
-time_trend=trends$interest_over_time
+<!-- ```{r} -->
+<!-- keywords=c("wave broadband") -->
+<!-- country=c('US-CA') -->
+<!-- #time=("2019-01-01 2018-08-27") -->
+<!-- time='today 12-m' -->
+<!-- channel='web' -->
+<!-- trends_1 = gtrends(keywords, gprop =channel,geo=country, time = time, onlyInterest = TRUE) -->
+<!-- time_trend_1 = trends_1$interest_over_time -->
+<!-- # city <- trends$interest_by_city -->
 
-plot <- ggplot(data=time_trend, aes(x=date, y=hits,group=keyword,col=keyword))+
-  geom_line()+xlab('Time')+ylab('Relative Interest')+ theme_bw()+
-  theme(legend.title = element_blank(),legend.position="bottom",legend.text=element_text(size=12))+ggtitle("Rolling 12-month Google Search Volume - Washington State")
-ggplotly(plot)
-```
+<!-- plot <- ggplot(data=time_trend_1, aes(x=date, y=hits,group=keyword,col=keyword))+ -->
+<!--   geom_line()+xlab('Time')+ylab('Relative Interest')+ theme_bw()+ -->
+<!--   theme(legend.title = element_blank(),legend.position="bottom",legend.text=element_text(size=12))+ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(plot) -->
+<!-- ``` -->
+
+<!-- ### <font size="5">**Top Related Topics: California**</font> -->
+
+<!-- ```{r} -->
+<!-- #keywords_related <- "ziply fiber" -->
+<!-- topics_1 = head(gtrends(keywords_1, geo=country_1)$related_topics, n=10) -->
+<!-- topics_1$subject <- as.numeric(topics_1$subject) %>% na.omit() -->
+<!-- topics_1 <- topics_1 %>% filter(related_topics == "top") -->
+
+<!-- p23 <- ggplot(data=topics_1, aes(x=reorder(value,subject), y=subject, text = paste("Related Topic: ", value, -->
+<!--       "<br>Relative Interest: ", subject)))+ -->
+<!--  geom_col(fill = "orange", alpha = 0.7) + -->
+<!--   xlab('') + -->
+<!--   ylab('Relative Interest') + -->
+<!--   coord_flip() + -->
+<!--   theme(legend.title = element_blank(), -->
+<!--         legend.position="bottom", -->
+<!--         legend.text=element_text(size=12), -->
+<!--         axis.text.x = element_text(size=10,color="darkblue"), -->
+<!--         axis.text.y = element_text(size=10,color="darkblue")) + -->
+<!--   ylim(0,NA) -->
+<!--   # theme_minimal() -->
+<!--   # ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(p23, tooltip = "text") -->
+<!-- ``` -->
+
+<!-- Row -->
+<!-- ------------------------------------- -->
+
+<!-- ### <font size="5">**Google Interest Trends by Brand: Oregon**</font> -->
+
+<!-- ```{r} -->
+<!-- keywords_2=c("wave broadband") -->
+<!-- country_2=c('US-OR') -->
+<!-- #time=("2019-01-01 2018-08-27") -->
+<!-- time='today 12-m' -->
+<!-- channel='web' -->
+<!-- trends_2 = gtrends(keywords_2, gprop =channel,geo=country_2, time = time, onlyInterest = TRUE) -->
+<!-- time_trend_2 = trends_2$interest_over_time -->
+<!-- # city <- trends$interest_by_city -->
+
+<!-- plot <- ggplot(data=time_trend_2, aes(x=date, y=hits,group=keyword,col=keyword))+ -->
+<!--   geom_line()+xlab('Time')+ylab('Relative Interest')+ theme_bw()+ -->
+<!--   theme(legend.title = element_blank(),legend.position="bottom",legend.text=element_text(size=12))+ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(plot) -->
+<!-- ``` -->
+
+<!-- ### <font size="5">**Top Related Topics: Oregon**</font> -->
+
+<!-- ```{r} -->
+<!-- #keywords_related <- "ziply fiber" -->
+<!-- topics_2 = head(gtrends(keywords_2, geo=country_2)$related_topics, n=10) -->
+<!-- topics_2$subject <- as.numeric(topics_2$subject) %>% na.omit() -->
+<!-- topics_2 <- topics_2 %>% filter(related_topics == "top") -->
+
+<!-- p23 <- ggplot(data=topics_2, aes(x=reorder(value,subject), y=subject, text = paste("Related Topic: ", value, -->
+<!--       "<br>Relative Interest: ", subject)))+ -->
+<!--  geom_col(fill = "orange", alpha = 0.7) + -->
+<!--   xlab('') + -->
+<!--   ylab('Relative Interest') + -->
+<!--   coord_flip() + -->
+<!--   theme(legend.title = element_blank(), -->
+<!--         legend.position="bottom", -->
+<!--         legend.text=element_text(size=12), -->
+<!--         axis.text.x = element_text(size=10,color="darkblue"), -->
+<!--         axis.text.y = element_text(size=10,color="darkblue")) + -->
+<!--   ylim(0,NA) -->
+<!--   # theme_minimal() -->
+<!--   # ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(p23, tooltip = "text") -->
+<!-- ``` -->
 
 Recent Reviews {data-icon="far fa-comments"}
 ==================================================
@@ -619,7 +716,7 @@ sentiment_messages_polarity <- tidy_tweets %>%
   # filter(date>=as.Date("2020-01-01")) %>%
   # filter(src != "FaceBook") %>%
   inner_join(my_lexicon, by = "word") %>%
-  group_by(rec, text, brand, created_at, src) %>%
+  group_by(text, brand, created_at, src, region, location) %>%
   summarize(sentiment = sum(value),
             words = n()) %>%
   ungroup() %>%
@@ -637,9 +734,18 @@ Row
 
 ### <font size="5">**Recent Social Media Reviews and Sentiment Polarity**</font>
 ```{r}
-DT::datatable(sentiment_messages_polarity[,-c(5:6)],
-          caption = "Reviews by Sentiment Polarity",
-          rownames = T,
+DT::datatable(sentiment_messages_polarity[,-c(7,8)],
+          # caption = "REVIEWS",
+          rownames = TRUE,
+          colnames = c(
+            "BRAND" = "brand",
+            "REGION" = "region",
+            "LOCATION" = "location",
+            "DATE" = "created_at",
+            "REVIEW" = "text",
+            "SENTIMENT" = "polarity",
+            "SOURCE" = "src"
+          ),
           filter = "top",
           options = list(pageLength=25))
 ```
