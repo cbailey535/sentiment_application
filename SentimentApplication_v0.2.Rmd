@@ -38,6 +38,7 @@ library(gtrendsR)
 library(reshape2)
 library(ggrepel)
 library(grid)
+library(crosstalk)
 
 
 theme_set(theme_light())
@@ -50,7 +51,6 @@ review <- readr::read_csv('raw_text_consolidated.csv') %>%
 review$created_at <- as.Date(review$created_at)
 loughran_data <- readr::read_csv('loughran.csv')
 afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
-
 # C:\\Users\\cbail\\Desktop\\DataFiles\\patriot_sent\\SentimentApplication\\
 ```
 
@@ -78,6 +78,30 @@ tidy_tweets <- review_copy %>%
          !word %in% str_remove_all(stop_words$word, "'"),
          !word %in% remove_words,
          str_detect(word, "[a-z]"))
+
+sd <- SharedData$new(tidy_tweets)
+```
+
+Sidebar {.sidebar}
+===================================================
+
+### <font size="5">**Filters**</font>
+
+```{r}
+    f1 <- filter_select("brand", "Select Brand:", sd, ~brand, allLevels = FALSE)
+    # c3 <- filter_checkbox("segment", "Select Customer Segment:", sd_2, ~customer_segment, columns = 2, allLevels = FALSE)
+    # c4 <- filter_checkbox("waveg", "Select WaveG:", sd_2, ~wave_g, columns = 2, allLevels = FALSE)
+
+# filter_1 <- bscols(widths = c(NA,NA,NA),
+#        device = c("lg"),
+#   list(c2,c3,c4)
+#   )
+
+filter_1 <- bscols(
+  list(f1)
+  )
+
+filter_1
 ```
 
 Data {data-icon="fa-database"}
@@ -189,27 +213,46 @@ Row
 
 ### <font size="5">**Wave Broadband Key Topic Analysis**</font>
 ```{r}
-wave_top_word <- tidy_tweets %>%
-  filter(brand == "Wave") %>%
-  # filter(date>= "2020-01-01") %>%
-  count(word, week) %>%
+renderPlot({
+wave_top_word <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    count(word, week) %>%
   bind_tf_idf(word, week, n) %>%
   arrange(desc(tf_idf)) %>%
   group_by(week) %>%
   #top_n(1, tf_idf) %>% 
   distinct(week, .keep_all = TRUE) %>%
-  arrange(week)
+  arrange(week) 
+
+# wave_top_word <- tidy_tweets %>%
+#   filter(brand == "Wave") %>%
+#   # filter(date>= "2020-01-01") %>%
+#   count(word, week) %>%
+#   bind_tf_idf(word, week, n) %>%
+#   arrange(desc(tf_idf)) %>%
+#   group_by(week) %>%
+#   #top_n(1, tf_idf) %>% 
+#   distinct(week, .keep_all = TRUE) %>%
+#   arrange(week)
 
 wave_top_word %>%
-  ggplot(aes(week, n)) +
-  geom_line(color = "royalblue", size = 1.5) +
-  geom_point(color = "royalblue", size = 2) +
-  geom_text_repel(aes(label = word, color = word)) +
+  ggplot(aes(week, n, label= word, color=word)) +
+  geom_line(color = "royalblue", size = 2) +
+  geom_point(color = "royalblue", size = 5) +
+  # geom_text_repel(aes(label = word, color = word)) +
+  geom_label_repel(size = 8,
+                   box.padding = unit(0.5, "lines")) +
   expand_limits(y = 0) +
   labs(title = "Most common words by week: Wave", 
           y = "Word count",
           x = "Word") +
-  theme(legend.position = "none")
+  theme(legend.position = "none",
+        plot.title=element_text(size=16,face="bold"),
+        # axis.text=element_text(size=16),
+        axis.title=element_text(size=18,face="bold"),
+        axis.text.x = element_text(size = 18),
+        axis.text.y = element_text(size = 18)
+        )
+})
 ```
 
 Word Trends {data-icon="fa-chart-line"}
