@@ -1,0 +1,725 @@
+---
+title: "Sentiment Application"
+author:  "Chris Bailey"
+date: '`r Sys.Date()`'
+output: 
+  flexdashboard::flex_dashboard:
+    theme: cosmo
+    orientation: rows
+    vertical_layout: fill
+runtime: shiny
+resource:
+  - raw_text_consolidated.csv
+  - loughran.csv
+  - afinn_111.xlsx
+---
+
+```{r}
+library(flexdashboard)
+library(shiny)
+library(shinythemes)
+library(openintro)
+library(highcharter)
+library(knitr)
+library(lubridate) 
+library(scales) 
+library(tidytext) 
+library(tidyverse)
+library(broom) 
+library(textdata)
+library(plotly)
+library(wordcloud)
+library(RColorBrewer)
+library(reshape2) 
+library(ggraph)
+library(igraph)
+library(plotly)
+library(gtrendsR)
+library(reshape2)
+library(ggrepel)
+library(grid)
+library(crosstalk)
+
+
+theme_set(theme_light())
+mycolors <- c("blue", "#FFC125", "darkgreen", "darkorange")
+```
+
+```{r}
+review <- readr::read_csv('raw_text_consolidated.csv',
+                          col_names = TRUE,
+                          na = c("", "NA"),
+                          trim_ws = TRUE,
+                          skip = 0,
+                          progress = show_progress(), 
+                          skip_empty_rows = TRUE) %>%
+  filter_at(vars(rec,created_at,review,src,brand,region,location,market),all_vars(!is.na(.))) %>%
+  mutate(week = as.Date(floor_date(created_at, "week", week_start = 1)))
+review$created_at <- as.Date(review$created_at)
+maxdt <- max(review$created_at)
+loughran_data <- readr::read_csv('loughran.csv')
+afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
+my_loughran <- loughran_data
+my_lexicon <- afinn_111
+```
+
+```{r}
+review_copy <- review 
+
+review_copy$review <-  gsub("https\\S*", "", review_copy$review)
+review_copy$review <-  gsub("@\\S*", "", review_copy$review)
+review_copy$review <-  gsub("amp", "", review_copy$review)
+review_copy$review <-  gsub("[\r\n]", "", review_copy$review)
+review_copy$review <-  gsub("[[:punct:]]", "", review_copy$review)
+replace_reg1 <- "https://t.co/[A-Za-z\\d]+|" 
+replace_reg2 <- "http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https+|" 
+replace_reg <- paste0(replace_reg1, replace_reg2) 
+unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
+remove_words <- c("hey")
+
+tidy_tweets <- review_copy %>%
+  # filter(!str_detect(text, "^RT")) %>%
+  mutate(text = str_replace_all(review, replace_reg, "")) %>% 
+  # unnest_tokens(word, text, token = "tweets", strip_punct =TRUE) %>%
+  unnest_tokens(word, review, token = "regex", pattern = unnest_reg) %>%
+  filter(!word %in% stop_words$word,
+         !word %in% str_remove_all(stop_words$word, "'"),
+         !word %in% remove_words,
+         str_detect(word, "[a-z]"))
+
+sd <- SharedData$new(review_copy)
+sd1 <- SharedData$new(tidy_tweets)
+sd2 <- SharedData$new(review_copy)
+
+```
+
+Data {data-icon="fa-database"}
+==================================================
+
+Sidebar {.sidebar}
+--------------------------------------------------
+
+### <font size="5">**Filters**</font>
+
+```{r}
+f1 <- filter_select("market", "Select Market:", sd, ~market, allLevels = FALSE)
+
+filter_1 <- bscols(
+  list(f1)
+  )
+
+filter_1
+```
+
+#### <font size="5">**Date Last Refreshed:**</font>
+#### <font size="5">**```r maxdt```**</font>
+
+Row {data-height=350}
+--------------------------------------------------
+
+### <font size="5">**Social Media Reviews by Market**</font>
+```{r}
+renderPlotly({
+
+  brand_cnt <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    group_by(market) %>%
+    summarise(units = length(unique(rec))) %>%
+    arrange(desc(units))
+
+  p1 <- brand_cnt %>%
+    plot_ly(labels = ~market,
+            values = ~units,
+            marker = list(colors = mycolors)) %>%
+    add_pie(hole = 0.4) %>%
+    layout(xaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F),
+         yaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F))
+  ggplotly(p1)
+})
+```
+
+### <font size="5">**Social Media Reviews by Brand**</font>
+```{r}
+renderPlotly({
+
+  brand_cnt <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    group_by(brand) %>%
+    summarise(units = length(unique(rec))) %>%
+    arrange(desc(units))
+
+  p1 <- brand_cnt %>%
+    plot_ly(labels = ~brand,
+            values = ~units,
+            marker = list(colors = mycolors)) %>%
+    add_pie(hole = 0.4) %>%
+    layout(xaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F),
+         yaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F))
+  ggplotly(p1)
+})
+```
+
+### <font size="5">**Social Media Reviews by Location**</font>
+```{r}
+renderPlotly({
+
+  location_cnt <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    group_by(location) %>%
+    summarise(units = length(unique(rec))) %>%
+    arrange(desc(units)) %>%
+    head()
+
+  p2 <- location_cnt %>%
+    plot_ly(labels = ~location,
+            values = ~units,
+            marker = list(colors = mycolors)) %>%
+    add_pie(hole = 0.4) %>%
+    layout(xaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F),
+         yaxis = list(zeroline = F,
+                      showline = F,
+                      showticklabels = F,
+                      showgrid = F))
+  ggplotly(p2)
+})
+```
+
+Row
+--------------------------------------------------
+
+### <font size="5">**Social Media Reviews by Brand**</font>
+```{r}
+renderPlot({
+
+  review_ts_chart <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    # select(rec,created_at, review, week, brand, region, src, market) %>%
+    arrange(brand, as.Date(created_at))
+
+  review_ts_chart %>%
+    group_by(brand, created_at) %>%
+    summarize(count = length(unique(rec))) %>%
+    arrange(brand, as.Date(created_at)) %>%
+    ggplot(aes(created_at, count, brand, fill = factor(brand), color=brand)) +
+    geom_point(size = 3) +
+    geom_line(size = 1) +
+    geom_area(alpha = 0.2) +
+    facet_wrap(~ brand, scales = "free") +
+    expand_limits(y=0) +
+    #scale_y_continuous(limits = c(0,100)) +
+    labs(title = "Count of Reviews by Brand",
+            y = "Review count",
+            x = "Date",
+         subtitle = "Includes reviews sourced from FaceBook and Twitter") +
+    theme(strip.background = element_rect(fill = "blue"),
+          strip.text = element_text(size = 12, face = "bold"),
+          legend.position = "none",
+          plot.title.position = "plot") +
+    scale_x_date(date_breaks = "1 week", date_labels =  "%b %d")
+    # scale_x_date(labels = date_format("%m-%Y"))
+})
+```
+
+Topics {data-icon="fa-chart-line"}
+==================================================
+
+Sidebar {.sidebar}
+--------------------------------------------------
+
+### <font size="5">**Filters**</font>
+
+```{r}
+# f2 <- filter_select("market", "Select Market:", sd1, ~market, allLevels = FALSE)
+f3 <- filter_select("brand", "Select Brand:", sd1, ~brand, allLevels = FALSE)
+
+filter_2 <- bscols(
+  list(f3)
+  )
+
+filter_2
+```
+
+Row
+--------------------------------------------------
+
+### <font size="5">**Key Topics**</font>
+```{r}
+renderPlot({
+
+  top_word <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
+  count(word, week) %>%
+  bind_tf_idf(word, week, n) %>%
+  arrange(desc(tf_idf)) %>%
+  group_by(week) %>%
+  #top_n(1, tf_idf) %>%
+  distinct(week, .keep_all = TRUE) %>%
+  arrange(week)
+
+  shiny::validate(
+    shiny::need(nrow(top_word) != 0,
+         "Oh snap!  No results due to insufficient data.")
+  )
+  top_word
+
+top_word %>%
+  ggplot(aes(week, n, label= word, color=word)) +
+  geom_line(color = "royalblue", size = 2) +
+  geom_point(color = "royalblue", size = 5) +
+  # geom_text_repel(aes(label = word, color = word)) +
+  geom_label_repel(size = 8,
+                   box.padding = unit(0.5, "lines")) +
+  expand_limits(y = 0) +
+  labs(
+    # title = "Topics",
+          y = "Word count",
+          x = "Date") +
+  theme(legend.position = "none",
+        plot.title=element_text(size=16,face="bold"),
+        # axis.text=element_text(size=16),
+        axis.title=element_text(size=18,face="bold"),
+        axis.text.x = element_text(size = 18, angle=60, hjust=1),
+        axis.text.y = element_text(size = 18)
+        ) +
+    scale_x_date(date_breaks = "1 week", date_labels =  "%b %d")
+})
+```
+
+Row
+--------------------------------------------------
+
+### <font size="5">**Trending Words**</font>
+```{r}
+renderPlotly({
+# rolling_dt <- today() - months(3) #lubridate
+
+words_by_time <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
+  # filter(brand=="Wave") %>%
+  # filter(!str_detect(word, "^@")) %>%
+  # filter(date> "2020-01-01") %>%
+  mutate(time_floor = floor_date(created_at, unit = "week")) %>%
+  count(time_floor, word) %>%
+  # count(time_floor, period, word) %>%
+  ungroup() %>%
+  group_by(time_floor) %>%
+  # group_by(period, time_floor) %>%
+  mutate(time_total = sum(n)) %>%
+  group_by(word) %>%
+  mutate(word_total = sum(n)) %>%
+  ungroup() %>%
+  rename(count = n) %>%
+  filter(word_total>5)  # nbr of words used at least x times
+
+shiny::validate(
+    shiny::need(nrow(words_by_time) != 0,
+         "Oh snap!  No results due to insufficient data.")
+  )
+  words_by_time
+
+nested_data <- words_by_time %>%
+  # nest(-word,-time_floor)
+  nest_legacy(-word)
+
+shiny::validate(
+    shiny::need(nrow(nested_data) != 0,
+         "Oh snap!  No results due to insufficient data.")
+  )
+  nested_data
+
+nested_models <- nested_data %>%
+  mutate(models = map(data, ~glm(cbind(count, time_total) ~ time_floor, ., family = "binomial")))
+
+shiny::validate(
+    shiny::need(nrow(nested_models) != 0,
+         "Oh snap!  No results due to insufficient data.")
+  )
+  nested_models
+
+slopes <- nested_models %>%
+  unnest_legacy(map(models, tidy)) %>%
+  filter(term == "time_floor") %>%
+  mutate(adjusted.p.value = p.adjust(p.value))
+
+top_slopes <- slopes %>%
+  filter(adjusted.p.value<=0.1) %>%
+  select(-statistic,-p.value)
+
+shiny::validate(
+    shiny::need(nrow(top_slopes) != 0,
+         "Oh snap!  No results due to insufficient data.")
+  )
+  top_slopes
+
+# Which words' frequencies have changed the fastest over time?
+viz <- words_by_time %>%
+  inner_join(top_slopes, by = c("word")) %>%
+  ggplot(aes(time_floor,
+             count/time_total,
+             color = word,
+             lty = word)) +
+  geom_line(stat = "identity", size = 1.0) +
+  # geom_text(aes(label=word)) +
+  labs(x = NULL, y = "Word frequency") +
+  labs(title = "Key words exhibiting significant frequency changes over time.",
+          y = "Word count",
+          x = "Date") +
+  #scale_x_date(labels = date_format("%m-%Y")) +
+  #scale_x_date(date_breaks = "1 month", date_labels =  "%m-%Y") +
+  #scale_x_date(date_breaks = "1 month", date_labels =  "%m-%e-%Y") +
+  scale_x_date(date_breaks = "1 week", date_labels =  "%b %d") +
+  theme(text = element_text(size=12),
+        axis.text.x=element_text(angle=60, hjust=1),
+        legend.text = element_text(size=rel(1)),
+        legend.key.width = unit(1.5, "cm"),
+        axis.text.y = element_text(size = 16)
+        )
+ggplotly(viz)
+})
+```
+
+Word Ratios {data-icon="fa-chart-bar"}
+==================================================
+
+Row
+------------------------------------------------------------
+
+### <font size="5">**Word Ratios: Wave v Xfinity**</font>
+```{r}
+word_ratios <- tidy_tweets %>%
+  filter(brand %in% c("Wave","Xfinity")) %>%
+  # filter(!str_detect(word, "^@")) %>%
+  count(word, brand) %>%
+  group_by(word) %>%
+  filter(sum(n)>=5) %>%
+  ungroup() %>%
+  spread(brand, n, fill = 0) %>%
+  mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
+  mutate(logratio = log(Wave/Xfinity)) %>%
+  arrange(desc(logratio))
+
+xfin_word_ratios <- word_ratios %>%
+  arrange(abs(logratio))
+
+wr_1 <- xfin_word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(10, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16), legend.position = "none") +
+  coord_flip() +
+  ylab("<-Xfinity/Wave->") +
+  scale_fill_discrete(name = "", labels = c("Xfinity", "Wave"))
+ggplotly(wr_1)
+```
+
+### <font size="5">**Word Ratios: Wave v CenturyLink**</font>
+```{r}
+word_ratios <- tidy_tweets %>%
+  filter(brand %in% c("Wave","CenturyLink")) %>%
+  # filter(!str_detect(word, "^@")) %>%
+  count(word, brand) %>%
+  group_by(word) %>%
+  filter(sum(n)>=5) %>%
+  ungroup() %>%
+  spread(brand, n, fill = 0) %>%
+  mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
+  mutate(logratio = log(Wave/CenturyLink)) %>%
+  arrange(desc(logratio))
+
+clink_word_ratios <- word_ratios %>%
+  arrange(abs(logratio))
+
+wr_2 <-clink_word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(10, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16), legend.position = "none") +
+  coord_flip() +
+  ylab("<-CenturyLink/Wave->") +
+  scale_fill_discrete(name = "", labels = c("CenturyLink", "Wave"))
+ggplotly(wr_2)
+```
+
+### <font size="5">**Word Ratios: Wave v ATT**</font>
+```{r}
+word_ratios <- tidy_tweets %>%
+  filter(brand %in% c("Wave","ATT")) %>%
+  # filter(!str_detect(word, "^@")) %>%
+  count(word, brand) %>%
+  group_by(word) %>%
+  filter(sum(n)>=5) %>%
+  ungroup() %>%
+  spread(brand, n, fill = 0) %>%
+  mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
+  mutate(logratio = log(Wave/ATT)) %>%
+  arrange(desc(logratio))
+
+att_word_ratios <- word_ratios %>%
+  arrange(abs(logratio))
+
+wr_3 <- att_word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(10, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16), legend.position = "none") +
+  coord_flip() +
+  ylab("<-ATT/Wave->") +
+  scale_fill_discrete(name = "", labels = c("ATT", "Wave"))
+ggplotly(wr_3)
+```
+
+### <font size="5">**Word Ratios: Wave v Ziply**</font>
+```{r}
+word_ratios <- tidy_tweets %>%
+  filter(brand %in% c("Wave","Ziply")) %>%
+  # filter(!str_detect(word, "^@")) %>%
+  count(word, brand) %>%
+  group_by(word) %>%
+  filter(sum(n)>=5) %>%
+  ungroup() %>%
+  spread(brand, n, fill = 0) %>%
+  mutate_if(is.numeric, list(~(. + 1)/(sum(.) + 1))) %>%
+  mutate(logratio = log(Wave/Ziply)) %>%
+  arrange(desc(logratio))
+
+ziply_word_ratios <- word_ratios %>%
+  arrange(abs(logratio))
+
+wr_4 <- ziply_word_ratios %>%
+  group_by(logratio < 0) %>%
+  top_n(10, abs(logratio)) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, logratio)) %>%
+  ggplot(aes(word, logratio, fill = logratio < 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=16), legend.position = "none") +
+  coord_flip() +
+  ylab("<-Ziply/Wave->") +
+  scale_fill_discrete(name = "", labels = c("Ziply", "Wave"))
+ggplotly(wr_4)
+```
+
+Sentiment Drivers {data-icon="fa-smile-beam"}
+==================================================
+
+Sidebar {.sidebar}
+--------------------------------------------------
+
+### <font size="5">**Filters**</font>
+
+```{r}
+# f35 <- filter_select("market", "Select Market:", sd1, ~market, allLevels = FALSE)
+f5 <- filter_select("brand", "Select Brand:", sd1, ~brand, allLevels = FALSE)
+
+filter_3 <- bscols(
+  list(f5)
+  )
+
+filter_3
+```
+
+Row {data-height=450}
+--------------------------------------------------
+
+### <font size="5">**Sentiment Drivers**</font>
+```{r}
+renderPlot({
+  
+contributions <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(value))
+
+shiny::validate(
+    shiny::need(nrow(contributions) != 0,
+         "Oh snap!  No results due to insufficient data.")
+  )
+  contributions
+
+
+contributions %>%
+  top_n(20, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=20)) +
+  coord_flip()
+})
+```
+
+### <font size="5">**Sentiment Word Cloud**</font>
+```{r}
+renderPlot({
+  cloud_plot <- sd1$data(withSelection = TRUE, withFilter = TRUE)
+    
+  par(mar=c(.5,.5,.5,.5))
+  
+  cloud_plot %>%
+  inner_join(my_loughran) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"),
+                   colors = c("green", "orange", "red", "blue", "black"),
+                   title.bg.colors=c("grey90"),
+                   max.words = 250,
+                   title.size = 3,
+                   scale=c(6,.5))
+# par(las=0)
+})
+```
+
+Sentiment Trend {data-icon="fa-smile-beam"}
+==================================================
+
+Row {data-height=450}
+--------------------------------------------------
+
+### <font size="5">**Average Sentiment Score by Day**</font>
+```{r}
+sentiment_messages <- tidy_tweets %>%
+  # filter(brand %in% c("Wave","Xfinity","CenturyLink","ATT","Spectrum")) %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(created_at, brand) %>%
+  summarize(sentiment = mean(value),
+            words = n()) %>%
+  ungroup() %>%
+  filter(words>=2)
+
+p2 <- sentiment_messages %>%
+  group_by(created_at, brand) %>%
+  arrange(as.Date(created_at)) %>%
+  ggplot(aes(created_at, sentiment, fill = sentiment>0)) +
+  geom_col(alpha = 0.8) +
+  # scale_colour_manual(name = 'Sentiment > 0', values = setNames(c('green','red'),c(T, F))) +
+  # geom_line(show.legend = FALSE) +
+  theme(legend.position = "none", text = element_text(size=12),
+        axis.text.x=element_text(angle=60, hjust=1),
+        legend.text = element_text(size=rel(1)),
+        legend.key.width = unit(1.5, "cm"),
+        axis.title.x=element_blank(),
+        strip.background = element_rect(fill = "blue"),
+        strip.text = element_text(size = 14)) +
+  scale_x_date(date_breaks = "1 weeks") +
+  facet_wrap(~brand, scales = "fixed")
+ggplotly(p2, tooltip = c("date","sentiment"), dynamicTicks = TRUE)
+```
+
+Word Network {data-icon="fa-connectdevelop"}
+==================================================
+
+Sidebar {.sidebar}
+--------------------------------------------------
+
+### <font size="5">**Filters**</font>
+
+```{r}
+f15 <- filter_select("brand", "Select Brand:", sd2, ~brand, allLevels = FALSE)
+
+filter_4 <- bscols(
+  list(f15)
+  )
+
+filter_4
+```
+
+Row
+--------------------------------------------------
+
+### <font size="5">**Word Network**</font>
+```{r}
+renderPlot({
+
+  bigrams <- sd2$data(withSelection = TRUE, withFilter = TRUE) %>%
+    # filter(brand=="Wave") %>%
+  unnest_tokens(bigram, review, token = "ngrams", n = 2)
+
+bigrams %>%
+  count(bigram, sort = TRUE)
+
+bigrams_separated <- bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ")
+
+bigrams_filtered <- bigrams_separated %>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word) %>%
+  filter(!word1 %in% remove_words) %>%
+  filter(!word2 %in% remove_words) %>%
+  filter(str_detect(word1, "[a-z]")) %>%
+  filter(str_detect(word2, "[a-z]"))
+
+# new bigram counts:
+bigram_counts <- bigrams_filtered %>%
+  count(word1, word2, sort = TRUE)
+
+bigram_graph <- bigram_counts %>%
+  filter(n>5) %>%
+  graph_from_data_frame()
+
+set.seed(2016)
+par(mar=c(.1,.1,.1,.1))
+a <- grid::arrow(type = "open",
+                 length = unit(.01, "inches"),
+                 ends = "last")
+ggraph(bigram_graph, layout = "fr") +
+  geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour="royalblue") +
+  geom_node_point(color = "lightblue", size = 6) +
+  geom_node_text(aes(label = name), size=6, vjust = 1, hjust = 1, repel=FALSE, point.padding = unit(0.2, "lines"))
+})
+```
+
+Recent Reviews {data-icon="far fa-comments"}
+==================================================
+
+### <font size="5">**Recent Social Media Reviews and Sentiment Polarity**</font>
+
+```{r}
+sentiment_messages_polarity <- tidy_tweets %>%
+  # filter(date>=as.Date("2020-01-01")) %>%
+  # filter(src != "FaceBook") %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(text, brand, created_at, src, region, location) %>%
+  summarize(sentiment = sum(value),
+            words = n()) %>%
+  ungroup() %>%
+  #filter(words>= 4) %>%
+  mutate(polarity = ifelse(sentiment>=4,"Very Positive",ifelse(sentiment>=1 & sentiment<4, "Positive", ifelse(sentiment<=(-1) & sentiment>=(-3), "Negative", ifelse(sentiment<(-3),"Very Negative","Neutral")))))
+
+#Very Negative (rating -5 or -4)
+#Negative (rating -3, -2, or -1)
+#Positive (rating 1, 2, or 3)
+#Very Positive (rating 4 or 5)
+
+DT::datatable(sentiment_messages_polarity[,-c(7,8)],
+          # caption = "REVIEWS",
+          rownames = TRUE,
+          colnames = c(
+            "BRAND" = "brand",
+            "REGION" = "region",
+            "LOCATION" = "location",
+            "DATE" = "created_at",
+            "REVIEW" = "text",
+            "SENTIMENT" = "polarity",
+            "SOURCE" = "src"
+          ),
+          filter = "top",
+          options = list(pageLength=25))
+```
