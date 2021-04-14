@@ -25,13 +25,15 @@ token <- create_token(
 
 ```{r tweets, include=FALSE}
 bay_area <- search_tweets(
-                        "wave OR 
-                        att OR 
-                        xfinity OR
-                        comcast OR
-                        frontier OR
-                        sonic OR 
-                        consolidated
+                        "@WaveConnects OR
+                        @gowave_g OR
+                        @ATT OR 
+                        @Xfinity OR
+                        @comcast OR
+                        @comcastcares OR
+                        @FrontierCorp OR
+                        @sonicnet OR
+                        @MyCCITweets
                         ",
                         n = 10000,
                         include_rts = FALSE, 
@@ -43,13 +45,15 @@ bay_area <- search_tweets(
 
 bay_area$created_at <- format(bay_area$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
 bay_area$region <- "Bay Area"
+bay_area$market <- "Wave South"
 bay_area$src <- "Twitter"
 bay_area <- bay_area %>%
   mutate(brand =
            case_when(
              str_detect(text,"@WaveConnects") ~ "Wave",
-             str_detect(text,"@gowave_g") ~ "WaveG",
+             str_detect(text,"@gowave_g") ~ "Wave",
              str_detect(text,"@ATT") ~ "ATT",
+             str_detect(text,"AT&T") ~ "ATT",
              str_detect(text,"@FrontierCorp") ~ "Frontier",
              str_detect(text,"@MyCCITweets") ~ "Consolidated",
              str_detect(text,"@Xfinity") ~ "Xfinity",
@@ -57,22 +61,29 @@ bay_area <- bay_area %>%
              str_detect(text,"@Comcast") ~ "Xfinity",
              str_detect(text,"@comcast") ~ "Xfinity",
              str_detect(text,"@sonicnet") ~ "SonicNet",
-             str_detect(text,"@sonic") ~ "SonicNet",
+             str_detect(text,"Comcast") ~ "Xfinity",
+             str_detect(text,"comcast") ~ "Xfinity",
+             str_detect(text,"xfinity") ~ "Xfinity",
+             str_detect(text,"Xfinity") ~ "Xfinity",
+             str_detect(text,"XFinity") ~ "Xfinity",
              TRUE ~ "Other"
-                     ))
-bay_area <- bay_area %>% select(created_at,text,src,brand,region,location)
+                     )) %>%
+  filter(brand != "Other")
+bay_area <- bay_area %>% select(created_at,text,src,brand,region,location,market)
 write_as_csv(bay_area, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
 ```{r tweets, include=FALSE}
 sac <- search_tweets(
-                        "wave OR 
-                        att OR 
-                        xfinity OR
-                        comcast OR
-                        consolidated OR
-                        frontier OR
-                        sonic
+                        "@WaveConnects OR
+                        @gowave_g OR 
+                        @ATT OR 
+                        @Xfinity OR
+                        @comcast OR
+                        @comcastcares OR
+                        @MyCCITweets OR
+                        @FrontierCorp OR
+                        @sonicnet
                         ",
                         n = 10000,
                         include_rts = FALSE, 
@@ -84,13 +95,15 @@ sac <- search_tweets(
 
 sac$created_at <- format(sac$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
 sac$region <- "Sacramento"
+sac$market <- "Wave South"
 sac$src <- "Twitter"
 sac <- sac %>%
   mutate(brand =
            case_when(
              str_detect(text,"@WaveConnects") ~ "Wave",
-             str_detect(text,"@gowave_g") ~ "WaveG",
+             str_detect(text,"@gowave_g") ~ "Wave",
              str_detect(text,"@ATT") ~ "ATT",
+             str_detect(text,"AT&T") ~ "ATT",
              str_detect(text,"@FrontierCorp") ~ "Frontier",
              str_detect(text,"@MyCCITweets") ~ "Consolidated",
              str_detect(text,"@Xfinity") ~ "Xfinity",
@@ -99,16 +112,22 @@ sac <- sac %>%
              str_detect(text,"@Comcast") ~ "Xfinity",
              str_detect(text,"@comcast") ~ "Xfinity",
              str_detect(text,"@sonicnet") ~ "SonicNet",
-             str_detect(text,"@sonic") ~ "SonicNet",
+             str_detect(text,"Comcast") ~ "Xfinity",
+             str_detect(text,"comcast") ~ "Xfinity",
+             str_detect(text,"xfinity") ~ "Xfinity",
+             str_detect(text,"Xfinity") ~ "Xfinity",
+             str_detect(text,"XFinity") ~ "Xfinity",
              TRUE ~ "Other"
-                     ))
-sac <- sac %>% select(created_at,text,src,brand,region,location)
+                     )) %>%
+  filter(brand != "Other")
+sac <- sac %>% select(created_at,text,src,brand,region,location,market)
 write_as_csv(sac, "C:\\Users\\chbailey\\Documents\\sent_app\\sac.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
 ```{r tweets, include=FALSE}
 garb <- search_tweets(
-                        "wave",
+                        "@WaveConnects OR
+                        @gowave_g",
                         n = 10000,
                         include_rts = FALSE, 
                         retryonratelimit = TRUE,
@@ -119,30 +138,33 @@ garb <- search_tweets(
 
 garb$created_at <- format(garb$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
 garb$region <- "Garberville"
+garb$market <- "Wave South"
 garb$src <- "Twitter"
 garb <- garb %>%
   mutate(brand =
            case_when(
              str_detect(text,"@WaveConnects") ~ "Wave",
-             str_detect(text,"@gowave_g") ~ "WaveG",
+             str_detect(text,"@gowave_g") ~ "Wave",
              TRUE ~ "Other"
-                     ))
-garb <- garb %>% select(created_at,text,src,brand,region,location)
+                     )) %>%
+  filter(brand != "Other")
+garb <- garb %>% select(created_at,text,src,brand,region,location,market)
 write_as_csv(garb, "C:\\Users\\chbailey\\Documents\\sent_app\\garb.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
 ```{r tweets, include=FALSE}
 portland <- search_tweets(
-                        "wave OR
-                        xfinity OR
-                        spectrum OR
-                        charter OR
-                        centurylink OR
-                        directlink OR
-                        comcast OR
-                        directlink OR
+                        "@WaveConnects OR 
+                        @gowave_g OR
+                        @Xfinity OR
+                        @comcast OR
+                        @comcastcares OR
+                        @GetSpectrum OR
+                        @CenturyLink OR
+                        @CenturyLinkHome OR
+                        @DirectLinkCoop OR
                         molalla OR
-                        sandy",
+                        @CityofSandyOR",
                         n = 10000,
                         include_rts = FALSE, 
                         retryonratelimit = TRUE,
@@ -152,12 +174,13 @@ portland <- search_tweets(
 
 portland$created_at <- format(portland$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
 portland$region <- "Portland"
+portland$market <- "Wave South"
 portland$src <- "Twitter"
 portland <- portland %>%
   mutate(brand =
            case_when(
              str_detect(text,"@WaveConnects") ~ "Wave",
-             str_detect(text,"@gowave_g") ~ "WaveG",
+             str_detect(text,"@gowave_g") ~ "Wave",
              str_detect(text,"@GetSpectrum") ~ "Spectrum",
              str_detect(text,"@Ask_Spectrum") ~ "Spectrum",
              str_detect(text,"@CenturyLink") ~ "CenturyLink",
@@ -169,48 +192,66 @@ portland <- portland %>%
              str_detect(text,"@comcast") ~ "Xfinity",
              str_detect(text,"@DirectLinkCoop") ~ "DirectLink",
              str_detect(text,"@CityofSandyOR") ~ "CityofSandyOR",
+             str_detect(text,"Comcast") ~ "Xfinity",
+             str_detect(text,"comcast") ~ "Xfinity",
+             str_detect(text,"xfinity") ~ "Xfinity",
+             str_detect(text,"Xfinity") ~ "Xfinity",
+             str_detect(text,"XFinity") ~ "Xfinity",
              TRUE ~ "Other"
-                     ))
-portland <- portland %>% select(created_at,text,src,brand,region,location)
+                     )) %>%
+  filter(brand != "Other")
+portland <- portland %>% select(created_at,text,src,brand,region,location,market)
 write_as_csv(portland, "C:\\Users\\chbailey\\Documents\\sent_app\\portland.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
-<!-- ```{r tweets, include=FALSE} -->
-<!-- token <- create_token( -->
-<!--   app = 'marketingguy_text_mining', -->
-<!--   consumer_key = 'ReFDEfRS2s2jNbVIsNtU8rhEA', -->
-<!--   consumer_secret = 'nWWIPUlFAPQxeK688pw45pu541BJVHmZLa1mU0haBZV2zIUqqo', -->
-<!--   access_token = '18102142-on6G71rQMJm7wr4MoiW83jko8s5nFB7iuZGoZxupZ', -->
-<!--   access_secret = '84Z3Ab3uP7nQSdMn52tJXC64JZZG8mxD9ViBG4jsjnFjY') -->
+```{r tweets, include=FALSE}
+seattle <- search_tweets(
+                        "@WaveConnects OR 
+                        @gowave_g OR
+                        @Xfinity OR
+                        @comcast OR
+                        @comcastcares OR
+                        @ZiplyFiber OR
+                        @CenturyLink OR
+                        @CenturyLinkHome
+                        ",
+                        n = 10000,
+                        include_rts = FALSE, 
+                        retryonratelimit = TRUE,
+                        # Seattle
+                        geocode = "47.60,-122.33,140mi",  
+                        lang = "en"
+                        )
 
-<!-- woodburn <- search_tweets( -->
-<!--                         q = "@WaveConnects OR  -->
-<!--                         @gowave_g OR -->
-<!--                         @DirectLinkCoop OR -->
-<!--                         @Molalla_Comm OR -->
-<!--                         @CityofSandyOR -->
-<!--                         ", -->
-<!--                         n = 10000, -->
-<!--                         include_rts = FALSE,  -->
-<!--                         retryonratelimit = TRUE, -->
-<!--                         # Woodburn/Silverton/Molalla/Sandy/Rhododendran/Sheridan/Otis/Turner/Stayton/Canby -->
-<!--                         geocode = "45.14,-122.85,50mi",   -->
-<!--                         lang = "en" -->
-<!--                         ) -->
-
-<!-- woodburn$created_at <- format(garb$created_at, format= "%Y-%m-%dT%H:%M:%S.000") -->
-<!-- woodburn$region <- "Woodburn" -->
-<!-- woodburn$src <- "Twitter" -->
-<!-- woodburn <- woodburn %>% -->
-<!--   mutate(brand = -->
-<!--            case_when( -->
-<!--              str_detect(text,"@WaveConnects") ~ "Wave", -->
-<!--              str_detect(text,"@gowave_g") ~ "WaveG", -->
-<!--              str_detect(text,"@DirectLinkCoop") ~ "DirectLink", -->
-<!--              str_detect(text,"@Molalla_Comm") ~ "MolallaComm", -->
-<!--              str_detect(text,"@CityofSandyOR") ~ "SandyNet", -->
-<!--              TRUE ~ "Other" -->
-<!--                      )) -->
-<!-- woodburn <- woodburn %>% select(created_at,text,src,brand,region,location) -->
-<!-- write_as_csv(woodburn, "C:\\Users\\chbailey\\Documents\\sent_app\\woodburn.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8") -->
-<!-- ``` -->
+seattle$created_at <- format(seattle$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
+seattle$region <- "Seattle"
+seattle$market <- "Wave North"
+seattle$src <- "Twitter"
+seattle <- seattle %>%
+  mutate(brand =
+           case_when(
+             str_detect(text,"@WaveConnects") ~ "Wave",
+             str_detect(text,"@gowave_g") ~ "Wave",
+             str_detect(text,"@Xfinity") ~ "Xfinity",
+             str_detect(text,"@comcastcares") ~ "Xfinity",
+             str_detect(text,"@Comcast") ~ "Xfinity",
+             str_detect(text,"@comcast") ~ "Xfinity",
+             str_detect(text,"Comcast") ~ "Xfinity",
+             str_detect(text,"comcast") ~ "Xfinity",
+             str_detect(text,"xfinity") ~ "Xfinity",
+             str_detect(text,"Xfinity") ~ "Xfinity",
+             str_detect(text,"XFinity") ~ "Xfinity",
+             str_detect(text,"@CenturyLinkHome") ~ "CenturyLink",
+             str_detect(text,"@centurylink") ~ "CenturyLink",
+             str_detect(text,"CenturyLink") ~ "CenturyLink",
+             str_detect(text,"centurylink") ~ "CenturyLink",
+             str_detect(text,"@ZiplyFiber") ~ "Ziply",
+             str_detect(text,"@ziplyfiber") ~ "Ziply",
+             str_detect(text,"Ziply") ~ "Ziply",
+             str_detect(text,"ziply") ~ "Ziply",
+             TRUE ~ "Other"
+                     )) %>%
+  filter(brand != "Other")
+seattle <- seattle %>% select(created_at,text,src,brand,region,location,market)
+write_as_csv(seattle, "C:\\Users\\chbailey\\Documents\\sent_app\\seattle.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
