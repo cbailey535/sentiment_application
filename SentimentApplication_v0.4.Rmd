@@ -59,7 +59,7 @@ review$created_at <- as.Date(review$created_at)
 maxdt <- max(review$created_at)
 loughran_data <- readr::read_csv('loughran.csv')
 afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
-my_loughran <- loughran_data
+my_loughran <- loughran_data %>% filter(sentiment != "superfluous")
 my_lexicon <- afinn_111
 ```
 
@@ -90,6 +90,7 @@ tidy_tweets <- review_copy %>%
 sd <- SharedData$new(review_copy)
 sd1 <- SharedData$new(tidy_tweets)
 sd2 <- SharedData$new(review_copy)
+sd3 <- SharedData$new(tidy_tweets)
 
 ```
 
@@ -103,9 +104,10 @@ Sidebar {.sidebar}
 
 ```{r}
 f1 <- filter_select("market", "Select Market:", sd, ~market, allLevels = FALSE)
+f11 <- filter_select("brand", "Select Brand:", sd, ~brand, allLevels = FALSE)
 
 filter_1 <- bscols(
-  list(f1)
+  list(f1,f11)
   )
 
 filter_1
@@ -116,6 +118,28 @@ filter_1
 
 Row {data-height=350}
 --------------------------------------------------
+
+### <font size="5">**Count of Reviews**</font> {.value-box data-width=150}
+
+```{r}
+renderValueBox({
+  
+  total_reviews <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    group_by(market) %>%
+    summarise(units = length(unique(rec))) 
+  
+  value <- sum(total_reviews$units)
+
+  if(!is.infinite(value) && !is.nan(value) && !is.na(value)) { 
+  if(value >=1){
+    valueBox(value = format(value, nsmall=0, big.mark = ","), icon = "far fa-comments", color = "success")
+    } else {
+valueBox(value = "No records to display", icon = "fas fa-comments", color = "warning")
+    }
+  }
+
+})
+```
 
 ### <font size="5">**Social Media Reviews by Market**</font>
 ```{r}
@@ -256,7 +280,7 @@ Row
 ### <font size="5">**Key Topics**</font>
 ```{r}
 renderPlot({
-
+  
   top_word <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
   count(word, week) %>%
   bind_tf_idf(word, week, n) %>%
@@ -351,7 +375,7 @@ slopes <- nested_models %>%
   mutate(adjusted.p.value = p.adjust(p.value))
 
 top_slopes <- slopes %>%
-  filter(adjusted.p.value<=0.1) %>%
+  filter(adjusted.p.value<=0.5) %>%
   select(-statistic,-p.value)
 
 shiny::validate(
@@ -455,6 +479,9 @@ wr_2 <-clink_word_ratios %>%
 ggplotly(wr_2)
 ```
 
+Row
+------------------------------------------------------------
+
 ### <font size="5">**Word Ratios: Wave v ATT**</font>
 ```{r}
 word_ratios <- tidy_tweets %>%
@@ -527,7 +554,7 @@ Sidebar {.sidebar}
 
 ```{r}
 # f35 <- filter_select("market", "Select Market:", sd1, ~market, allLevels = FALSE)
-f5 <- filter_select("brand", "Select Brand:", sd1, ~brand, allLevels = FALSE)
+f5 <- filter_select("brand", "Select Brand:", sd3, ~brand, allLevels = FALSE)
 
 filter_3 <- bscols(
   list(f5)
@@ -543,7 +570,7 @@ Row {data-height=450}
 ```{r}
 renderPlot({
   
-contributions <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
+contributions <- sd3$data(withSelection = TRUE, withFilter = TRUE) %>%
   inner_join(my_lexicon, by = "word") %>%
   group_by(word) %>%
   summarize(occurences = n(),
@@ -569,7 +596,7 @@ contributions %>%
 ### <font size="5">**Sentiment Word Cloud**</font>
 ```{r}
 renderPlot({
-  cloud_plot <- sd1$data(withSelection = TRUE, withFilter = TRUE)
+  cloud_plot <- sd3$data(withSelection = TRUE, withFilter = TRUE)
     
   par(mar=c(.5,.5,.5,.5))
   
@@ -596,7 +623,7 @@ Row {data-height=450}
 ### <font size="5">**Average Sentiment Score by Day**</font>
 ```{r}
 sentiment_messages <- tidy_tweets %>%
-  # filter(brand %in% c("Wave","Xfinity","CenturyLink","ATT","Spectrum")) %>%
+  filter(brand %in% c("Wave","Xfinity","CenturyLink","ATT","Ziply")) %>%
   inner_join(my_lexicon, by = "word") %>%
   group_by(created_at, brand) %>%
   summarize(sentiment = mean(value),
@@ -606,7 +633,7 @@ sentiment_messages <- tidy_tweets %>%
 
 p2 <- sentiment_messages %>%
   group_by(created_at, brand) %>%
-  arrange(as.Date(created_at)) %>%
+  arrange(brand,as.Date(created_at)) %>%
   ggplot(aes(created_at, sentiment, fill = sentiment>0)) +
   geom_col(alpha = 0.8) +
   # scale_colour_manual(name = 'Sentiment > 0', values = setNames(c('green','red'),c(T, F))) +
@@ -618,8 +645,8 @@ p2 <- sentiment_messages %>%
         axis.title.x=element_blank(),
         strip.background = element_rect(fill = "blue"),
         strip.text = element_text(size = 14)) +
-  scale_x_date(date_breaks = "1 weeks") +
-  facet_wrap(~brand, scales = "fixed")
+  scale_x_date(date_breaks = "1 week", date_labels = "W%") +
+  facet_wrap(~brand, scales = "free", nrow=2)
 ggplotly(p2, tooltip = c("date","sentiment"), dynamicTicks = TRUE)
 ```
 
@@ -649,7 +676,7 @@ Row
 renderPlot({
 
   bigrams <- sd2$data(withSelection = TRUE, withFilter = TRUE) %>%
-    # filter(brand=="Wave") %>%
+    filter(!brand %in% c("Consolidated","SonicNet","Ziply")) %>%
   unnest_tokens(bigram, review, token = "ngrams", n = 2)
 
 bigrams %>%
@@ -700,8 +727,8 @@ sentiment_messages_polarity <- tidy_tweets %>%
   summarize(sentiment = sum(value),
             words = n()) %>%
   ungroup() %>%
-  #filter(words>= 4) %>%
-  mutate(polarity = ifelse(sentiment>=4,"Very Positive",ifelse(sentiment>=1 & sentiment<4, "Positive", ifelse(sentiment<=(-1) & sentiment>=(-3), "Negative", ifelse(sentiment<(-3),"Very Negative","Neutral")))))
+  # filter(words>= 4) %>%
+  mutate(polarity = ifelse(sentiment>=6,"Very Positive",ifelse(sentiment>=4 & sentiment<6, "Positive", ifelse(sentiment<=(-1) & sentiment>=(-3), "Negative", ifelse(sentiment<(-3),"Very Negative","Neutral")))))
 
 #Very Negative (rating -5 or -4)
 #Negative (rating -3, -2, or -1)
