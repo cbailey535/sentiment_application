@@ -5,14 +5,15 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r setup, include=FALSE}
+```{r}
 knitr::opts_chunk$set(echo = TRUE, cache = TRUE,
                       message = FALSE, warning = FALSE,
                       dpi = 180, fig.height = 8, fig.width = 5)
 ```
 
-```{r libraries, include=FALSE}
+```{r libraries}
 library(rtweet)
+# https://www.rdocumentation.org/packages/rtweet/versions/0.7.0/topics/search_tweets
 library(tidyverse)
 
 token <- create_token(
@@ -21,9 +22,11 @@ token <- create_token(
   consumer_secret = 'nWWIPUlFAPQxeK688pw45pu541BJVHmZLa1mU0haBZV2zIUqqo',
   access_token = '18102142-on6G71rQMJm7wr4MoiW83jko8s5nFB7iuZGoZxupZ',
   access_secret = '84Z3Ab3uP7nQSdMn52tJXC64JZZG8mxD9ViBG4jsjnFjY')
+
+search_date <- Sys.Date()-2
 ```
 
-```{r tweets, include=FALSE}
+```{r tweets}
 bay_area <- search_tweets(
                         "@WaveConnects OR
                         @gowave_g OR
@@ -40,7 +43,8 @@ bay_area <- search_tweets(
                         retryonratelimit = TRUE,
                         # SFO
                         geocode = "37.77,-122.43,25mi",  
-                        lang = "en"
+                        lang = "en",
+                        since=search_date
                         )
 
 bay_area$created_at <- format(bay_area$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
@@ -70,10 +74,10 @@ bay_area <- bay_area %>%
                      )) %>%
   filter(brand != "Other")
 bay_area <- bay_area %>% select(created_at,text,src,brand,region,location,market)
-write_as_csv(bay_area, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+# write_as_csv(bay_area, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
-```{r tweets, include=FALSE}
+```{r tweets}
 sac <- search_tweets(
                         "@WaveConnects OR
                         @gowave_g OR 
@@ -90,7 +94,8 @@ sac <- search_tweets(
                         retryonratelimit = TRUE,
                         # Sacramento/Roseville/Rocklin/Lincoln/Auburn/North Auburn/Granite Bay/Woodland
                         geocode = "38.57,-121.47,50mi",  
-                        lang = "en"
+                        lang = "en",
+                        since=search_date
                         )
 
 sac$created_at <- format(sac$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
@@ -121,36 +126,37 @@ sac <- sac %>%
                      )) %>%
   filter(brand != "Other")
 sac <- sac %>% select(created_at,text,src,brand,region,location,market)
-write_as_csv(sac, "C:\\Users\\chbailey\\Documents\\sent_app\\sac.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+# write_as_csv(sac, "C:\\Users\\chbailey\\Documents\\sent_app\\sac.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
-```{r tweets, include=FALSE}
-garb <- search_tweets(
-                        "@WaveConnects OR
-                        @gowave_g",
-                        n = 10000,
-                        include_rts = FALSE, 
-                        retryonratelimit = TRUE,
-                        # Garberville/Redway/Benbow
-                        geocode = "40.10,-123.79,100mi",  
-                        lang = "en"
-                        )
+<!-- ```{r tweets} -->
+<!-- garb <- search_tweets( -->
+<!--                         "@WaveConnects OR -->
+<!--                         @gowave_g", -->
+<!--                         n = 10000, -->
+<!--                         include_rts = FALSE,  -->
+<!--                         retryonratelimit = TRUE, -->
+<!--                         # Garberville/Redway/Benbow -->
+<!--                         geocode = "40.10,-123.79,100mi",   -->
+<!--                         lang = "en", -->
+<!--                         since=search_date -->
+<!--                         ) -->
 
-garb$created_at <- format(garb$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
-garb$region <- "Garberville"
-garb$market <- "Wave South"
-garb$src <- "Twitter"
-garb <- garb %>%
-  mutate(brand =
-           case_when(
-             str_detect(text,"@WaveConnects") ~ "Wave",
-             str_detect(text,"@gowave_g") ~ "Wave",
-             TRUE ~ "Other"
-                     )) %>%
-  filter(brand != "Other")
-garb <- garb %>% select(created_at,text,src,brand,region,location,market)
-write_as_csv(garb, "C:\\Users\\chbailey\\Documents\\sent_app\\garb.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
-```
+<!-- garb$created_at <- format(garb$created_at, format= "%Y-%m-%dT%H:%M:%S.000") -->
+<!-- garb$region <- "Garberville" -->
+<!-- garb$market <- "Wave South" -->
+<!-- garb$src <- "Twitter" -->
+<!-- garb <- garb %>% -->
+<!--   mutate(brand = -->
+<!--            case_when( -->
+<!--              str_detect(text,"@WaveConnects") ~ "Wave", -->
+<!--              str_detect(text,"@gowave_g") ~ "Wave", -->
+<!--              TRUE ~ "Other" -->
+<!--                      )) %>% -->
+<!--   filter(brand != "Other") -->
+<!-- garb <- garb %>% select(created_at,text,src,brand,region,location,market) -->
+<!-- write_as_csv(garb, "C:\\Users\\chbailey\\Documents\\sent_app\\garb.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8") -->
+<!-- ``` -->
 
 ```{r tweets, include=FALSE}
 portland <- search_tweets(
@@ -162,14 +168,13 @@ portland <- search_tweets(
                         @GetSpectrum OR
                         @CenturyLink OR
                         @CenturyLinkHome OR
-                        @DirectLinkCoop OR
-                        molalla OR
-                        @CityofSandyOR",
+                        @DirectLinkCoop",
                         n = 10000,
                         include_rts = FALSE, 
                         retryonratelimit = TRUE,
-                        geocode = "45.52,-122.67,60mi",  
-                        lang = "en"
+                        geocode = "45.52,-122.67,75mi",  
+                        lang = "en",
+                        since=search_date
                         )
 
 portland$created_at <- format(portland$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
@@ -201,10 +206,10 @@ portland <- portland %>%
                      )) %>%
   filter(brand != "Other")
 portland <- portland %>% select(created_at,text,src,brand,region,location,market)
-write_as_csv(portland, "C:\\Users\\chbailey\\Documents\\sent_app\\portland.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+# write_as_csv(portland, "C:\\Users\\chbailey\\Documents\\sent_app\\portland.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
-```{r tweets, include=FALSE}
+```{r tweets}
 seattle <- search_tweets(
                         "@WaveConnects OR 
                         @gowave_g OR
@@ -220,7 +225,8 @@ seattle <- search_tweets(
                         retryonratelimit = TRUE,
                         # Seattle
                         geocode = "47.60,-122.33,140mi",  
-                        lang = "en"
+                        lang = "en",
+                        since=search_date
                         )
 
 seattle$created_at <- format(seattle$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
@@ -253,5 +259,10 @@ seattle <- seattle %>%
                      )) %>%
   filter(brand != "Other")
 seattle <- seattle %>% select(created_at,text,src,brand,region,location,market)
-write_as_csv(seattle, "C:\\Users\\chbailey\\Documents\\sent_app\\seattle.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+# write_as_csv(seattle, "C:\\Users\\chbailey\\Documents\\sent_app\\seattle.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+```{r tweets}
+all_markets <- do.call("rbind", list(bay_area, sac, portland, seattle))
+write_as_csv(all_markets, "C:\\Users\\chbailey\\Documents\\sent_app\\all_markets.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
