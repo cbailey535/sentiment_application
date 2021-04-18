@@ -132,7 +132,7 @@ renderValueBox({
 
   if(!is.infinite(value) && !is.nan(value) && !is.na(value)) { 
   if(value >=1){
-    valueBox(value = format(value, nsmall=0, big.mark = ","), icon = "far fa-comments", color = "success")
+    valueBox(value = format(value, nsmall=0, big.mark = ","), icon = "far fa-comments", color = "primary")
     } else {
 valueBox(value = "No records to display", icon = "fas fa-comments", color = "warning")
     }
@@ -342,7 +342,7 @@ words_by_time <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
   mutate(word_total = sum(n)) %>%
   ungroup() %>%
   rename(count = n) %>%
-  filter(word_total>5)  # nbr of words used at least x times
+  filter(word_total>3)  # nbr of words used at least x times
 
 shiny::validate(
     shiny::need(nrow(words_by_time) != 0,
@@ -479,9 +479,6 @@ wr_2 <-clink_word_ratios %>%
 ggplotly(wr_2)
 ```
 
-Row
-------------------------------------------------------------
-
 ### <font size="5">**Word Ratios: Wave v ATT**</font>
 ```{r}
 word_ratios <- tidy_tweets %>%
@@ -553,11 +550,11 @@ Sidebar {.sidebar}
 ### <font size="5">**Filters**</font>
 
 ```{r}
-# f35 <- filter_select("market", "Select Market:", sd1, ~market, allLevels = FALSE)
+f35 <- filter_select("market", "Select Market:", sd3, ~market, allLevels = FALSE)
 f5 <- filter_select("brand", "Select Brand:", sd3, ~brand, allLevels = FALSE)
 
 filter_3 <- bscols(
-  list(f5)
+  list(f35,f5)
   )
 
 filter_3
@@ -646,7 +643,7 @@ p2 <- sentiment_messages %>%
         strip.background = element_rect(fill = "blue"),
         strip.text = element_text(size = 14)) +
   scale_x_date(date_breaks = "1 week", date_labels = "W%") +
-  facet_wrap(~brand, scales = "free", nrow=2)
+  facet_grid(~brand, scales = "fixed")
 ggplotly(p2, tooltip = c("date","sentiment"), dynamicTicks = TRUE)
 ```
 
@@ -698,7 +695,7 @@ bigram_counts <- bigrams_filtered %>%
   count(word1, word2, sort = TRUE)
 
 bigram_graph <- bigram_counts %>%
-  filter(n>5) %>%
+  filter(n>=3) %>%
   graph_from_data_frame()
 
 set.seed(2016)
