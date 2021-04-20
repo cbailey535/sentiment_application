@@ -1,5 +1,5 @@
 ---
-title: "Sentiment Application"
+title: "TEXT DATA ANALYTICS"
 author:  "Chris Bailey"
 date: '`r Sys.Date()`'
 output: 
@@ -305,13 +305,13 @@ top_word %>%
                    box.padding = unit(0.5, "lines")) +
   expand_limits(y = 0) +
   labs(
-    # title = "Topics",
+          title = "Represents the number of reviews that contain the key words shown in the graph.",
           y = "Word count",
           x = "Date") +
   theme(legend.position = "none",
-        plot.title=element_text(size=16,face="bold"),
+        plot.title=element_text(size=18),
         # axis.text=element_text(size=16),
-        axis.title=element_text(size=18,face="bold"),
+        axis.title=element_text(size=18),
         axis.text.x = element_text(size = 18, angle=60, hjust=1),
         axis.text.y = element_text(size = 18)
         ) +
@@ -402,7 +402,7 @@ viz <- words_by_time %>%
   #scale_x_date(date_breaks = "1 month", date_labels =  "%m-%e-%Y") +
   scale_x_date(date_breaks = "1 week", date_labels =  "%b %d") +
   theme(text = element_text(size=12),
-        axis.text.x=element_text(angle=60, hjust=1),
+        axis.text.x=element_text(size=12,angle=60, hjust=1),
         legend.text = element_text(size=rel(1)),
         legend.key.width = unit(1.5, "cm"),
         axis.text.y = element_text(size = 16)
@@ -581,7 +581,7 @@ shiny::validate(
 
 
 contributions %>%
-  top_n(20, abs(contribution)) %>%
+  top_n(16, abs(contribution)) %>%
   mutate(word = reorder(word, contribution)) %>%
   ggplot(aes(word, contribution, fill = contribution > 0)) +
   geom_col(show.legend = FALSE) +
@@ -695,7 +695,7 @@ bigram_counts <- bigrams_filtered %>%
   count(word1, word2, sort = TRUE)
 
 bigram_graph <- bigram_counts %>%
-  filter(n>=3) %>%
+  filter(n>=5) %>%
   graph_from_data_frame()
 
 set.seed(2016)
