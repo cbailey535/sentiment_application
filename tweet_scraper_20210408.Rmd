@@ -23,7 +23,7 @@ token <- create_token(
   access_token = '18102142-on6G71rQMJm7wr4MoiW83jko8s5nFB7iuZGoZxupZ',
   access_secret = '84Z3Ab3uP7nQSdMn52tJXC64JZZG8mxD9ViBG4jsjnFjY')
 
-search_date <- Sys.Date()-2
+search_date <- Sys.Date()-1
 ```
 
 ```{r tweets}
