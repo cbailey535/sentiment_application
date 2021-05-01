@@ -40,7 +40,6 @@ library(ggrepel)
 library(grid)
 library(crosstalk)
 
-
 theme_set(theme_light())
 mycolors <- c("blue", "#FFC125", "darkgreen", "darkorange")
 ```
@@ -55,6 +54,7 @@ review <- readr::read_csv('raw_text_consolidated.csv',
                           skip_empty_rows = TRUE) %>%
   filter_at(vars(rec,created_at,review,src,brand,region,location,market),all_vars(!is.na(.))) %>%
   mutate(week = as.Date(floor_date(created_at, "week", week_start = 1)))
+
 review$created_at <- as.Date(review$created_at)
 maxdt <- max(review$created_at)
 loughran_data <- readr::read_csv('loughran.csv')
@@ -87,10 +87,14 @@ tidy_tweets <- review_copy %>%
          !word %in% remove_words,
          str_detect(word, "[a-z]"))
 
+tidy_tweets_copy <- tidy_tweets %>%
+  filter(market %in% c('Wave North','Wave South'))
+
 sd <- SharedData$new(review_copy)
 sd1 <- SharedData$new(tidy_tweets)
 sd2 <- SharedData$new(review_copy)
 sd3 <- SharedData$new(tidy_tweets)
+sd4 <- SharedData$new(tidy_tweets_copy)
 
 ```
 
@@ -105,9 +109,10 @@ Sidebar {.sidebar}
 ```{r}
 f1 <- filter_select("market", "Select Market:", sd, ~market, allLevels = FALSE)
 f11 <- filter_select("brand", "Select Brand:", sd, ~brand, allLevels = FALSE)
+f111 <- filter_select("period", "Select Week(s):", sd, ~week, allLevels = FALSE)
 
 filter_1 <- bscols(
-  list(f1,f11)
+  list(f1,f11,f111)
   )
 
 filter_1
@@ -266,9 +271,10 @@ Sidebar {.sidebar}
 ```{r}
 # f2 <- filter_select("market", "Select Market:", sd1, ~market, allLevels = FALSE)
 f3 <- filter_select("brand", "Select Brand:", sd1, ~brand, allLevels = FALSE)
+f113 <- filter_select("period", "Select Week(s):", sd1, ~week, allLevels = FALSE)
 
 filter_2 <- bscols(
-  list(f3)
+  list(f3,f113)
   )
 
 filter_2
@@ -414,12 +420,30 @@ ggplotly(viz)
 Word Ratios {data-icon="fa-chart-bar"}
 ==================================================
 
+Sidebar {.sidebar}
+--------------------------------------------------
+
+### <font size="5">**Filters**</font>
+
+```{r}
+f85 <- filter_select("market", "Select Market:", sd4, ~market, allLevels = FALSE)
+# f118 <- filter_select("period", "Select Week(s):", sd4, ~week, allLevels = FALSE)
+
+filter_6 <- bscols(
+  list(f85)
+  )
+
+filter_6
+```
+
 Row
 ------------------------------------------------------------
 
 ### <font size="5">**Word Ratios: Wave v Xfinity**</font>
 ```{r}
-word_ratios <- tidy_tweets %>%
+renderPlotly({
+word_ratios <- sd4$data(withSelection = TRUE, withFilter = TRUE) %>%
+  filter(market %in% c("Wave North","Wave South")) %>%
   filter(brand %in% c("Wave","Xfinity")) %>%
   # filter(!str_detect(word, "^@")) %>%
   count(word, brand) %>%
@@ -446,11 +470,14 @@ wr_1 <- xfin_word_ratios %>%
   ylab("<-Xfinity/Wave->") +
   scale_fill_discrete(name = "", labels = c("Xfinity", "Wave"))
 ggplotly(wr_1)
+})
 ```
 
 ### <font size="5">**Word Ratios: Wave v CenturyLink**</font>
 ```{r}
-word_ratios <- tidy_tweets %>%
+renderPlotly({
+word_ratios <- sd4$data(withSelection = TRUE, withFilter = TRUE) %>%
+  filter(market %in% c("Wave North","Wave South")) %>%
   filter(brand %in% c("Wave","CenturyLink")) %>%
   # filter(!str_detect(word, "^@")) %>%
   count(word, brand) %>%
@@ -477,11 +504,14 @@ wr_2 <-clink_word_ratios %>%
   ylab("<-CenturyLink/Wave->") +
   scale_fill_discrete(name = "", labels = c("CenturyLink", "Wave"))
 ggplotly(wr_2)
+})
 ```
 
 ### <font size="5">**Word Ratios: Wave v ATT**</font>
 ```{r}
-word_ratios <- tidy_tweets %>%
+renderPlotly({
+word_ratios <- sd4$data(withSelection = TRUE, withFilter = TRUE) %>%
+  filter(market %in% c("Wave North","Wave South")) %>%
   filter(brand %in% c("Wave","ATT")) %>%
   # filter(!str_detect(word, "^@")) %>%
   count(word, brand) %>%
@@ -508,11 +538,14 @@ wr_3 <- att_word_ratios %>%
   ylab("<-ATT/Wave->") +
   scale_fill_discrete(name = "", labels = c("ATT", "Wave"))
 ggplotly(wr_3)
+})
 ```
 
 ### <font size="5">**Word Ratios: Wave v Ziply**</font>
 ```{r}
-word_ratios <- tidy_tweets %>%
+renderPlotly({
+word_ratios <- sd4$data(withSelection = TRUE, withFilter = TRUE) %>%
+  filter(market %in% c("Wave North","Wave South")) %>%
   filter(brand %in% c("Wave","Ziply")) %>%
   # filter(!str_detect(word, "^@")) %>%
   count(word, brand) %>%
@@ -539,6 +572,7 @@ wr_4 <- ziply_word_ratios %>%
   ylab("<-Ziply/Wave->") +
   scale_fill_discrete(name = "", labels = c("Ziply", "Wave"))
 ggplotly(wr_4)
+})
 ```
 
 Sentiment Drivers {data-icon="fa-smile-beam"}
@@ -552,9 +586,10 @@ Sidebar {.sidebar}
 ```{r}
 f35 <- filter_select("market", "Select Market:", sd3, ~market, allLevels = FALSE)
 f5 <- filter_select("brand", "Select Brand:", sd3, ~brand, allLevels = FALSE)
+f115 <- filter_select("period", "Select Week(s):", sd3, ~week, allLevels = FALSE)
 
 filter_3 <- bscols(
-  list(f35,f5)
+  list(f35,f5,f115)
   )
 
 filter_3
@@ -657,9 +692,11 @@ Sidebar {.sidebar}
 
 ```{r}
 f15 <- filter_select("brand", "Select Brand:", sd2, ~brand, allLevels = FALSE)
+f55 <- filter_select("market", "Select Market:", sd2, ~market, allLevels = FALSE)
+f120 <- filter_select("period", "Select Week(s):", sd2, ~week, allLevels = FALSE)
 
 filter_4 <- bscols(
-  list(f15)
+  list(f55,f15,f120)
   )
 
 filter_4
