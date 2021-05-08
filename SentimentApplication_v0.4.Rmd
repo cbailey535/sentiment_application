@@ -53,7 +53,8 @@ review <- readr::read_csv('raw_text_consolidated.csv',
                           progress = show_progress(), 
                           skip_empty_rows = TRUE) %>%
   filter_at(vars(rec,created_at,review,src,brand,region,location,market),all_vars(!is.na(.))) %>%
-  mutate(week = as.Date(floor_date(created_at, "week", week_start = 1)))
+  mutate(week = as.Date(floor_date(created_at, "week", week_start = 1))) %>%
+  filter(brand != c("Consolidated","Frontier"))
 
 review$created_at <- as.Date(review$created_at)
 maxdt <- max(review$created_at)
@@ -75,7 +76,9 @@ replace_reg1 <- "https://t.co/[A-Za-z\\d]+|"
 replace_reg2 <- "http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https+|" 
 replace_reg <- paste0(replace_reg1, replace_reg2) 
 unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
-remove_words <- c("hey")
+remove_words <- c("hey",
+                  "u001f620"
+                  )
 
 tidy_tweets <- review_copy %>%
   # filter(!str_detect(text, "^RT")) %>%
@@ -678,7 +681,7 @@ p2 <- sentiment_messages %>%
         strip.background = element_rect(fill = "blue"),
         strip.text = element_text(size = 14)) +
   scale_x_date(date_breaks = "1 week", date_labels = "W%") +
-  facet_grid(~brand, scales = "fixed")
+  facet_wrap(~brand, scales = "free")
 ggplotly(p2, tooltip = c("date","sentiment"), dynamicTicks = TRUE)
 ```
 
