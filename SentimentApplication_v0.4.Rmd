@@ -1,7 +1,7 @@
 ---
 title: "TEXT DATA ANALYTICS"
 author:  "Chris Bailey"
-date: '`r Sys.Date()`'
+# date: '`r Sys.Date()`'
 output: 
   flexdashboard::flex_dashboard:
     theme: cosmo
@@ -54,7 +54,7 @@ review <- readr::read_csv('raw_text_consolidated.csv',
                           skip_empty_rows = TRUE) %>%
   filter_at(vars(rec,created_at,review,src,brand,region,location,market),all_vars(!is.na(.))) %>%
   mutate(week = as.Date(floor_date(created_at, "week", week_start = 1))) %>%
-  filter(brand != c("Consolidated","Frontier"))
+  filter(!brand %in% c('Consolidated','Frontier')) 
 
 review$created_at <- as.Date(review$created_at)
 maxdt <- max(review$created_at)
@@ -77,7 +77,16 @@ replace_reg2 <- "http://[A-Za-z\\d]+|&amp;|&lt;|&gt;|RT|https+|"
 replace_reg <- paste0(replace_reg1, replace_reg2) 
 unnest_reg <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
 remove_words <- c("hey",
-                  "u001f620"
+                  "u001f620",
+                  "comcast",
+                  "xfinity",
+                  "wave",
+                  "att",
+                  "centurylink",
+                  "ziply",
+                  "frontier",
+                  "century",
+                  "link"
                   )
 
 tidy_tweets <- review_copy %>%
@@ -90,8 +99,9 @@ tidy_tweets <- review_copy %>%
          !word %in% remove_words,
          str_detect(word, "[a-z]"))
 
-tidy_tweets_copy <- tidy_tweets %>%
-  filter(market %in% c('Wave North','Wave South'))
+tidy_tweets_copy <- tidy_tweets 
+# %>%
+#   filter(market %in% c('Wave North','Wave South'))
 
 sd <- SharedData$new(review_copy)
 sd1 <- SharedData$new(tidy_tweets)
