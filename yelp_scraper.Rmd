@@ -1,0 +1,195 @@
+---
+title: "Untitled"
+output: github_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rvest)     # HTML Hacking & Web Scraping
+library(jsonlite)  # JSON manipulation
+library(tidyverse) # Data Manipulation
+library(tidyquant) # ggplot2 theme
+library(xopen)     # Opens URL in Browser
+library(knitr)     # Pretty HTML Tables
+
+# tutorial = https://www.business-science.io/code-tools/2019/10/07/rvest-web-scraping.html
+# https://martinctc.github.io/blog/vignette-scraping-amazon-reviews-in-r/
+```
+
+```{r}
+# URL to View All Bikes
+url <- "https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&sort_by=date_desc"  
+```
+
+```{r}
+# View URL in Browser
+xopen(url)
+```
+
+```{r}
+url <- "https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&start=10&sort_by=date_desc"
+
+scrape_yelp <- function(url){
+  
+  url_reviews <- url
+  
+  doc <- read_html(url_reviews) # Assign results to `doc`
+
+  # Review Location
+  review_location <- doc %>% 
+    html_nodes("[class=' user-passport-info border-color--default__373c0__2oFDT']") %>%
+    html_text()
+  
+  # Review Text
+  review_text <- doc %>% 
+    html_nodes("[class='comment__373c0__1M-px css-n6i4z7']") %>%
+    html_text()
+
+  # Number of stars in review
+  review_date <- doc %>%
+    # html_nodes("[class=' arrange__373c0__2C9bH gutter-1__373c0__2l5bx vertical-align-middle__373c0__1SDTo border-color--default__373c0__3-ifU']") %>%
+    # html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
+    html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
+    html_text()
+  
+  review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  review_date[!is.na(review_date)]
+  review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y") 
+  review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  tibble(review_date,
+         review_location[-1],
+         review_text) %>% return()
+}
+```
+
+```{r}
+scrape_yelp(url) %>% View()
+```
+
+#alternate script
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0,10,20,30) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&start=", STARTS))
+
+   # Review Location
+  review_location <- doc %>% 
+    html_nodes("[class=' responsive-hidden-small__373c0__2vDff border-color--default__373c0__3-ifU']") %>%
+    html_text()
+  review_location[-1]
+  
+  # Review Text
+  review_text <- doc %>% 
+    html_nodes("[class='comment__373c0__1M-px css-n6i4z7']") %>%
+    html_text()
+
+  # Number of stars in review
+  review_date <- doc %>%
+    # html_nodes("[class=' arrange__373c0__2C9bH gutter-1__373c0__2l5bx vertical-align-middle__373c0__1SDTo border-color--default__373c0__3-ifU']") %>%
+    # html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
+    html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
+    html_text()
+  
+  review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  review_date[!is.na(review_date)]
+  review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
+  review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  # tibble(review_date,
+  #        review_location[2:11],
+  #        review_text) %>% return()
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  # clean_date <- review_date
+  # clean_review <- review_text
+  # for(i in seq_along(clean_date))
+  # {
+  #   if (str_detect(review_date[i],"Previous review") == TRUE)
+  #   {
+  #     bad_date <- i
+  #     clean_date <- review_date[-bad_date]
+  #     clean_review <- review_text[-bad_date]
+  #   } else{"do nothing"}
+  #   if (str_detect(review_date[i],"Updated review") == TRUE)
+  #   {
+  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
+  #   }else{"do nothing"}
+  # }
+  # 
+  return(data.frame(review_date, review_location[-1], review_text))
+  
+}
+
+yelp_output <- map_dfr(STARTS, yelp_scrape)
+yelp_output %>% View()
+```
+
+
+
+
+
+
+
+
+
+
+
+#alternate script
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0, 20, 40) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  yelp_html <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&start=", STARTS),"div.review-list")
+
+  yelp_html_2 <- html_nodes(yelp_html,"div.review.review--with-sidebar")
+  # Reviewer locations
+  location <- html_text(html_nodes(yelp_html_2,"li.user-location.responsive-hidden-small"))
+  str_replace_all(str_replace_all(location,"\n",""),"  ","")
+  
+  # reveiw content
+  content <- html_text(html_nodes(yelp_html_2,"div.review-content > p"))
+  
+  # Review dates
+  date <- html_text(html_nodes(yelp_html_2,"div.biz-rating.biz-rating-large.clearfix > span"))
+  date <- str_replace_all(str_replace_all(date,"\n",""),"  ","")
+  
+  
+  # Review Rating
+  review <- html_nodes(yelp_html_2,"div.i-stars")%>% 
+    html_attr("title")
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  clean_date <- date
+  clean_review <- review
+  for(i in seq_along(date))
+  {
+    if (str_detect(date[i],"Previous review") == TRUE)
+    {
+      bad_date <- i
+      clean_date <- date[-bad_date]
+      clean_review <- review[-bad_date]
+    } else{"do nothing"}
+    if (str_detect(date[i],"Updated review") == TRUE)
+    {
+      clean_date[i] <- str_replace(date[i],"Updated review","")
+    }else{"do nothing"}
+  } 
+  
+  return(data.frame(clean_date, location, clean_review, content))
+  
+}
+
+yelp_output <- map_dfr(STARTS, yelp_scrape)
+yelp_output
+```
+
