@@ -23,7 +23,7 @@ token <- create_token(
   access_token = '18102142-on6G71rQMJm7wr4MoiW83jko8s5nFB7iuZGoZxupZ',
   access_secret = '84Z3Ab3uP7nQSdMn52tJXC64JZZG8mxD9ViBG4jsjnFjY')
 
-search_date <- Sys.Date()-2
+search_date <- Sys.Date()-1
 ```
 
 ```{r tweets}
@@ -129,35 +129,6 @@ sac <- sac %>% select(created_at,text,src,brand,region,location,market)
 # write_as_csv(sac, "C:\\Users\\chbailey\\Documents\\sent_app\\sac.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
-<!-- ```{r tweets} -->
-<!-- garb <- search_tweets( -->
-<!--                         "@WaveConnects OR -->
-<!--                         @gowave_g", -->
-<!--                         n = 10000, -->
-<!--                         include_rts = FALSE,  -->
-<!--                         retryonratelimit = TRUE, -->
-<!--                         # Garberville/Redway/Benbow -->
-<!--                         geocode = "40.10,-123.79,100mi",   -->
-<!--                         lang = "en", -->
-<!--                         since=search_date -->
-<!--                         ) -->
-
-<!-- garb$created_at <- format(garb$created_at, format= "%Y-%m-%dT%H:%M:%S.000") -->
-<!-- garb$region <- "Garberville" -->
-<!-- garb$market <- "Wave South" -->
-<!-- garb$src <- "Twitter" -->
-<!-- garb <- garb %>% -->
-<!--   mutate(brand = -->
-<!--            case_when( -->
-<!--              str_detect(text,"@WaveConnects") ~ "Wave", -->
-<!--              str_detect(text,"@gowave_g") ~ "Wave", -->
-<!--              TRUE ~ "Other" -->
-<!--                      )) %>% -->
-<!--   filter(brand != "Other") -->
-<!-- garb <- garb %>% select(created_at,text,src,brand,region,location,market) -->
-<!-- write_as_csv(garb, "C:\\Users\\chbailey\\Documents\\sent_app\\garb.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8") -->
-<!-- ``` -->
-
 ```{r tweets, include=FALSE}
 portland <- search_tweets(
                         "@WaveConnects OR 
@@ -168,7 +139,8 @@ portland <- search_tweets(
                         @GetSpectrum OR
                         @CenturyLink OR
                         @CenturyLinkHome OR
-                        @DirectLinkCoop",
+                        @AskZiplyFiber OR
+                        @ZiplyFiber",
                         n = 10000,
                         include_rts = FALSE, 
                         retryonratelimit = TRUE,
@@ -202,6 +174,8 @@ portland <- portland %>%
              str_detect(text,"xfinity") ~ "Xfinity",
              str_detect(text,"Xfinity") ~ "Xfinity",
              str_detect(text,"XFinity") ~ "Xfinity",
+             str_detect(text,"@AskZiplyFiber") ~ "Ziply",
+             str_detect(text,"@ZiplyFiber") ~ "Ziply",
              TRUE ~ "Other"
                      )) %>%
   filter(brand != "Other")
@@ -217,6 +191,7 @@ seattle <- search_tweets(
                         @comcast OR
                         @comcastcares OR
                         @ZiplyFiber OR
+                        @AskZiplyFiber OR
                         @CenturyLink OR
                         @CenturyLinkHome
                         ",
@@ -255,6 +230,7 @@ seattle <- seattle %>%
              str_detect(text,"@ziplyfiber") ~ "Ziply",
              str_detect(text,"Ziply") ~ "Ziply",
              str_detect(text,"ziply") ~ "Ziply",
+             str_detect(text,"@AskZiplyFiber") ~ "Ziply",
              TRUE ~ "Other"
                      )) %>%
   filter(brand != "Other")
