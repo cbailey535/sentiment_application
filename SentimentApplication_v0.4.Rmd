@@ -54,9 +54,12 @@ review <- readr::read_csv('raw_text_consolidated.csv',
                           skip_empty_rows = TRUE) %>%
   filter_at(vars(rec,created_at,review,src,brand,region,location,market),all_vars(!is.na(.))) %>%
   mutate(week = as.Date(floor_date(created_at, "week", week_start = 1))) %>%
-  filter(!brand %in% c('Consolidated','Frontier')) 
+  filter(!brand %in% c('Consolidated','Frontier','SonicNet','Spectrum')) 
 
 review$created_at <- as.Date(review$created_at)
+
+review <- review %>% filter(created_at>="2021-01-01")
+
 maxdt <- max(review$created_at)
 loughran_data <- readr::read_csv('loughran.csv')
 afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
@@ -123,9 +126,10 @@ Sidebar {.sidebar}
 f1 <- filter_select("market", "Select Market:", sd, ~market, allLevels = FALSE)
 f11 <- filter_select("brand", "Select Brand:", sd, ~brand, allLevels = FALSE)
 f111 <- filter_select("period", "Select Week(s):", sd, ~week, allLevels = FALSE)
+f1111 <- filter_select("source", "Select Source:", sd, ~src, allLevels = FALSE)
 
 filter_1 <- bscols(
-  list(f1,f11,f111)
+  list(f1,f11,f111,f1111)
   )
 
 filter_1
@@ -257,17 +261,18 @@ renderPlot({
     geom_point(size = 3) +
     geom_line(size = 1) +
     geom_area(alpha = 0.2) +
-    facet_wrap(~ brand, scales = "free") +
+    facet_wrap(~ brand, scales = "fixed") +
     expand_limits(y=0) +
     #scale_y_continuous(limits = c(0,100)) +
     labs(title = "Count of Reviews by Brand",
             y = "Review count",
             x = "Date",
-         subtitle = "Includes reviews sourced from FaceBook and Twitter") +
+         subtitle = "Includes reviews sourced from FaceBook, Twitter & Yelp") +
     theme(strip.background = element_rect(fill = "blue"),
-          strip.text = element_text(size = 12, face = "bold"),
+          strip.text = element_text(size = 14, face = "bold"),
           legend.position = "none",
-          plot.title.position = "plot") +
+          plot.title.position = "plot",
+          axis.text.x = element_text(size = 12, angle=90, hjust=1)) +
     scale_x_date(date_breaks = "1 week", date_labels =  "%b %d")
     # scale_x_date(labels = date_format("%m-%Y"))
 })
@@ -331,7 +336,7 @@ top_word %>%
         plot.title=element_text(size=18),
         # axis.text=element_text(size=16),
         axis.title=element_text(size=18),
-        axis.text.x = element_text(size = 18, angle=60, hjust=1),
+        axis.text.x = element_text(size = 18, angle=90, hjust=1),
         axis.text.y = element_text(size = 18)
         ) +
     scale_x_date(date_breaks = "1 week", date_labels =  "%b %d")
@@ -421,7 +426,7 @@ viz <- words_by_time %>%
   #scale_x_date(date_breaks = "1 month", date_labels =  "%m-%e-%Y") +
   scale_x_date(date_breaks = "1 week", date_labels =  "%b %d") +
   theme(text = element_text(size=12),
-        axis.text.x=element_text(size=12,angle=60, hjust=1),
+        axis.text.x=element_text(size=12,angle=90, hjust=1),
         legend.text = element_text(size=rel(1)),
         legend.key.width = unit(1.5, "cm"),
         axis.text.y = element_text(size = 16)
@@ -588,7 +593,7 @@ ggplotly(wr_4)
 })
 ```
 
-Sentiment Drivers {data-icon="fa-smile-beam"}
+Sentiment Driver Word Cloud {data-icon="fas fa-cloud"}
 ==================================================
 
 Sidebar {.sidebar}
@@ -611,34 +616,34 @@ filter_3
 Row {data-height=450}
 --------------------------------------------------
 
-### <font size="5">**Sentiment Drivers**</font>
-```{r}
-renderPlot({
-  
-contributions <- sd3$data(withSelection = TRUE, withFilter = TRUE) %>%
-  inner_join(my_lexicon, by = "word") %>%
-  group_by(word) %>%
-  summarize(occurences = n(),
-            contribution = sum(value))
+<!-- ### <font size="5">**Sentiment Drivers**</font> -->
+<!-- ```{r} -->
+<!-- renderPlot({ -->
 
-shiny::validate(
-    shiny::need(nrow(contributions) != 0,
-         "Oh snap!  No results due to insufficient data.")
-  )
-  contributions
+<!-- contributions <- sd3$data(withSelection = TRUE, withFilter = TRUE) %>% -->
+<!--   inner_join(my_lexicon, by = "word") %>% -->
+<!--   group_by(word) %>% -->
+<!--   summarize(occurences = n(), -->
+<!--             contribution = sum(value)) -->
+
+<!-- shiny::validate( -->
+<!--     shiny::need(nrow(contributions) != 0, -->
+<!--          "Oh snap!  No results due to insufficient data.") -->
+<!--   ) -->
+<!--   contributions -->
 
 
-contributions %>%
-  top_n(16, abs(contribution)) %>%
-  mutate(word = reorder(word, contribution)) %>%
-  ggplot(aes(word, contribution, fill = contribution > 0)) +
-  geom_col(show.legend = FALSE) +
-  theme(text = element_text(size=20)) +
-  coord_flip()
-})
-```
+<!-- contributions %>% -->
+<!--   top_n(16, abs(contribution)) %>% -->
+<!--   mutate(word = reorder(word, contribution)) %>% -->
+<!--   ggplot(aes(word, contribution, fill = contribution > 0)) + -->
+<!--   geom_col(show.legend = FALSE) + -->
+<!--   theme(text = element_text(size=20)) + -->
+<!--   coord_flip() -->
+<!-- }) -->
+<!-- ``` -->
 
-### <font size="5">**Sentiment Word Cloud**</font>
+### <font size="5">**Sentiment Driver Word Cloud**</font>
 ```{r}
 renderPlot({
   cloud_plot <- sd3$data(withSelection = TRUE, withFilter = TRUE)
@@ -654,8 +659,8 @@ renderPlot({
                    title.bg.colors=c("grey90"),
                    max.words = 250,
                    title.size = 3,
-                   scale=c(6,.5))
-# par(las=0)
+                   scale=c(7,1))
+  par(las=0)
 })
 ```
 
