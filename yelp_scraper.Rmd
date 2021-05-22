@@ -13,62 +13,249 @@ library(tidyverse) # Data Manipulation
 library(tidyquant) # ggplot2 theme
 library(xopen)     # Opens URL in Browser
 library(knitr)     # Pretty HTML Tables
+library(rtweet)
+# library(lubridate)
 
 # tutorial = https://www.business-science.io/code-tools/2019/10/07/rvest-web-scraping.html
 # https://martinctc.github.io/blog/vignette-scraping-amazon-reviews-in-r/
 ```
 
+<!-- Seattle -->
 ```{r}
-# URL to View All Bikes
-url <- "https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&sort_by=date_desc"  
-```
-
-```{r}
-# View URL in Browser
-xopen(url)
-```
-
-```{r}
-url <- "https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&start=10&sort_by=date_desc"
+url <- "https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&sort_by=date_desc"
 
 scrape_yelp <- function(url){
   
   url_reviews <- url
   
-  doc <- read_html(url_reviews) # Assign results to `doc`
+  doc <- read_html(url_reviews)
 
-  # Review Location
   review_location <- doc %>% 
-    html_nodes("[class=' user-passport-info border-color--default__373c0__2oFDT']") %>%
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
     html_text()
   
-  # Review Text
   review_text <- doc %>% 
-    html_nodes("[class='comment__373c0__1M-px css-n6i4z7']") %>%
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
     html_text()
 
-  # Number of stars in review
   review_date <- doc %>%
-    # html_nodes("[class=' arrange__373c0__2C9bH gutter-1__373c0__2l5bx vertical-align-middle__373c0__1SDTo border-color--default__373c0__3-ifU']") %>%
-    # html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
-    html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
-    html_text()
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
   
-  review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
-  review_date[!is.na(review_date)]
-  review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y") 
-  review_date <- review_date[!is.na(review_date)]
-  
-  # Return a tibble
   tibble(review_date,
-         review_location[-1],
-         review_text) %>% return()
+         review_location,
+         review_text)
 }
+
+seattle <- scrape_yelp(url)
+
+# all_markets <- do.call("rbind", list(bay_area, sac, portland, seattle))
+write_as_csv(seattle, "C:\\Users\\chbailey\\Documents\\sent_app\\seattle.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
 ```
 
+
+<!-- Portland -->
 ```{r}
-scrape_yelp(url) %>% View()
+url <- "https://www.yelp.com/biz/wave-broadband-canby-3?osq=Wave%20Broadband&sort_by=date_desc"
+
+scrape_yelp <- function(url){
+  
+  url_reviews <- url
+  
+  doc <- read_html(url_reviews)
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  tibble(review_date,
+         review_location,
+         review_text)
+}
+
+portland <- scrape_yelp(url)
+
+# all_markets <- do.call("rbind", list(bay_area, sac, portland, seattle))
+write_as_csv(portland, "C:\\Users\\chbailey\\Documents\\sent_app\\portland.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+
 ```
+
+
+<!-- Sacramento -->
+```{r}
+url <- "https://www.yelp.com/biz/wave-broadband-west-sacramento-3?osq=wave%20broadband&sort_by=date_desc"
+
+scrape_yelp <- function(url){
+  
+  url_reviews <- url
+  
+  doc <- read_html(url_reviews)
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  tibble(review_date,
+         review_location,
+         review_text)
+}
+
+sacramento <- scrape_yelp(url)
+
+# all_markets <- do.call("rbind", list(bay_area, sac, portland, seattle))
+write_as_csv(sacramento, "C:\\Users\\chbailey\\Documents\\sent_app\\sacramento.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+
+<!-- Bay Area 1 -->
+```{r}
+url <- "https://www.yelp.com/biz/wave-broadband-daly-city?osq=Wave%20Broadband&sort_by=date_desc"
+
+scrape_yelp <- function(url){
+  
+  url_reviews <- url
+  
+  doc <- read_html(url_reviews)
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  tibble(review_date,
+         review_location,
+         review_text)
+}
+
+bay_area_1 <- scrape_yelp(url)
+
+# all_markets <- do.call("rbind", list(bay_area, sac, portland, seattle))
+write_as_csv(bay_area_1, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area_1.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+<!-- Bay Area 2 -->
+```{r}
+url <- "https://www.yelp.com/biz/wave-broadband-san-mateo?sort_by=date_desc"
+
+scrape_yelp <- function(url){
+  
+  url_reviews <- url
+  
+  doc <- read_html(url_reviews)
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  tibble(review_date,
+         review_location,
+         review_text)
+}
+
+bay_area_2 <- scrape_yelp(url)
+
+# all_markets <- do.call("rbind", list(bay_area, sac, portland, seattle))
+write_as_csv(bay_area_2, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area_2.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+<!-- Bay Area 3 -->
+```{r}
+url <- "https://www.yelp.com/biz/wave-broadband-concord-6?osq=Wave%20Broadband&sort_by=date_desc"
+
+scrape_yelp <- function(url){
+  
+  url_reviews <- url
+  
+  doc <- read_html(url_reviews)
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  tibble(review_date,
+         review_location,
+         review_text)
+}
+
+bay_area_3 <- scrape_yelp(url)
+
+# all_markets <- do.call("rbind", list(bay_area, sac, portland, seattle))
+write_as_csv(bay_area_3, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area_3.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #alternate script
 ```{r}
