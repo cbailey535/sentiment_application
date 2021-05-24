@@ -20,6 +20,367 @@ library(rtweet)
 # https://martinctc.github.io/blog/vignette-scraping-amazon-reviews-in-r/
 ```
 
+#SEATTLE
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0,10,20) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&start=", STARTS))
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  # review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  # review_date[!is.na(review_date)]
+  # review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
+  # review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  # tibble(review_date,
+  #        review_location[2:11],
+  #        review_text) %>% return()
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  # clean_date <- review_date
+  # clean_review <- review_text
+  # for(i in seq_along(clean_date))
+  # {
+  #   if (str_detect(review_date[i],"Previous review") == TRUE)
+  #   {
+  #     bad_date <- i
+  #     clean_date <- review_date[-bad_date]
+  #     clean_review <- review_text[-bad_date]
+  #   } else{"do nothing"}
+  #   if (str_detect(review_date[i],"Updated review") == TRUE)
+  #   {
+  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
+  #   }else{"do nothing"}
+  # }
+  # 
+  return(data.frame(review_date, review_location, review_text))
+  
+}
+
+seattle <- map_dfr(STARTS, yelp_scrape)
+write_as_csv(seattle, "C:\\Users\\chbailey\\Documents\\sent_app\\seattle.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+#PORTLAND
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0,10,20) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-canby-3?osq=Wave%20Broadband&start=", STARTS))
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  # review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  # review_date[!is.na(review_date)]
+  # review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
+  # review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  # tibble(review_date,
+  #        review_location[2:11],
+  #        review_text) %>% return()
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  # clean_date <- review_date
+  # clean_review <- review_text
+  # for(i in seq_along(clean_date))
+  # {
+  #   if (str_detect(review_date[i],"Previous review") == TRUE)
+  #   {
+  #     bad_date <- i
+  #     clean_date <- review_date[-bad_date]
+  #     clean_review <- review_text[-bad_date]
+  #   } else{"do nothing"}
+  #   if (str_detect(review_date[i],"Updated review") == TRUE)
+  #   {
+  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
+  #   }else{"do nothing"}
+  # }
+  # 
+  return(data.frame(review_date, review_location, review_text))
+  
+}
+
+portland <- map_dfr(STARTS, yelp_scrape)
+write_as_csv(portland, "C:\\Users\\chbailey\\Documents\\sent_app\\portland.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+#SACRAMENTO
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0,10,20) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-west-sacramento-3?osq=wave%20broadband&start=", STARTS))
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  # review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  # review_date[!is.na(review_date)]
+  # review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
+  # review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  # tibble(review_date,
+  #        review_location[2:11],
+  #        review_text) %>% return()
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  # clean_date <- review_date
+  # clean_review <- review_text
+  # for(i in seq_along(clean_date))
+  # {
+  #   if (str_detect(review_date[i],"Previous review") == TRUE)
+  #   {
+  #     bad_date <- i
+  #     clean_date <- review_date[-bad_date]
+  #     clean_review <- review_text[-bad_date]
+  #   } else{"do nothing"}
+  #   if (str_detect(review_date[i],"Updated review") == TRUE)
+  #   {
+  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
+  #   }else{"do nothing"}
+  # }
+  # 
+  return(data.frame(review_date, review_location, review_text))
+  
+}
+
+sacremento <- map_dfr(STARTS, yelp_scrape)
+write_as_csv(sacremento, "C:\\Users\\chbailey\\Documents\\sent_app\\sacremento.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+
+#BAY AREA 1
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0,10,20) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-daly-city?osq=Wave%20Broadband&start=", STARTS))
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  # review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  # review_date[!is.na(review_date)]
+  # review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
+  # review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  # tibble(review_date,
+  #        review_location[2:11],
+  #        review_text) %>% return()
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  # clean_date <- review_date
+  # clean_review <- review_text
+  # for(i in seq_along(clean_date))
+  # {
+  #   if (str_detect(review_date[i],"Previous review") == TRUE)
+  #   {
+  #     bad_date <- i
+  #     clean_date <- review_date[-bad_date]
+  #     clean_review <- review_text[-bad_date]
+  #   } else{"do nothing"}
+  #   if (str_detect(review_date[i],"Updated review") == TRUE)
+  #   {
+  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
+  #   }else{"do nothing"}
+  # }
+  # 
+  return(data.frame(review_date, review_location, review_text))
+  
+}
+
+bay_area_1 <- map_dfr(STARTS, yelp_scrape)
+write_as_csv(bay_area_1, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area_1.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+
+#BAY AREA 2
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0,10,20) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-san-mateo?osq=wave+broadband&start=", STARTS))
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  # review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  # review_date[!is.na(review_date)]
+  # review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
+  # review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  # tibble(review_date,
+  #        review_location[2:11],
+  #        review_text) %>% return()
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  # clean_date <- review_date
+  # clean_review <- review_text
+  # for(i in seq_along(clean_date))
+  # {
+  #   if (str_detect(review_date[i],"Previous review") == TRUE)
+  #   {
+  #     bad_date <- i
+  #     clean_date <- review_date[-bad_date]
+  #     clean_review <- review_text[-bad_date]
+  #   } else{"do nothing"}
+  #   if (str_detect(review_date[i],"Updated review") == TRUE)
+  #   {
+  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
+  #   }else{"do nothing"}
+  # }
+  # 
+  return(data.frame(review_date, review_location, review_text))
+  
+}
+
+bay_area_2 <- map_dfr(STARTS, yelp_scrape)
+write_as_csv(bay_area_2, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area_2.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+#BAY AREA 3
+```{r}
+#list all the combinatios of start position, either by writing them out or through a loop of some kind
+STARTS <- c(0,10,20) #extend as needed
+
+yelp_scrape <- function(STARTS) {
+  
+  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-concord-6?osq=wave+broadband&start=", STARTS))
+
+  review_location <- doc %>% 
+    html_nodes(".arrange-unit-fill__373c0__17z0h .border-color--default__373c0__2oFDT .border-color--default__373c0__2oFDT .responsive-hidden-small__373c0__1ozaH .css-n6i4z7") %>%
+    html_text()
+  
+  review_text <- doc %>% 
+    html_nodes(".margin-b2__373c0__abANL .raw__373c0__3rcx7") %>%
+    html_text()
+
+  review_date <- doc %>%
+    html_nodes(".border-color--default__373c0__2oFDT+ .margin-b1-5__373c0__2Wblx .css-e81eai") %>%
+    html_text() 
+  
+  # review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
+  # review_date[!is.na(review_date)]
+  # review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
+  # review_date <- review_date[!is.na(review_date)]
+  
+  # Return a tibble
+  # tibble(review_date,
+  #        review_location[2:11],
+  #        review_text) %>% return()
+  
+  # Identify and indicate if a rewview is an update to a previous review
+  # clean_date <- review_date
+  # clean_review <- review_text
+  # for(i in seq_along(clean_date))
+  # {
+  #   if (str_detect(review_date[i],"Previous review") == TRUE)
+  #   {
+  #     bad_date <- i
+  #     clean_date <- review_date[-bad_date]
+  #     clean_review <- review_text[-bad_date]
+  #   } else{"do nothing"}
+  #   if (str_detect(review_date[i],"Updated review") == TRUE)
+  #   {
+  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
+  #   }else{"do nothing"}
+  # }
+  # 
+  return(data.frame(review_date, review_location, review_text))
+  
+}
+
+bay_area_3 <- map_dfr(STARTS, yelp_scrape)
+write_as_csv(bay_area_3, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area_3.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+
+
+```{r tweets}
+all_markets_yelp <- do.call("rbind", list(bay_area_1,bay_area_2,bay_area_3))
+write_as_csv(all_markets_yelp, "C:\\Users\\chbailey\\Documents\\sent_app\\all_markets_yelp.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 <!-- Seattle -->
 ```{r}
 url <- "https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&sort_by=date_desc"
@@ -257,67 +618,7 @@ write_as_csv(bay_area_3, "C:\\Users\\chbailey\\Documents\\sent_app\\bay_area_3.c
 
 
 
-#alternate script
-```{r}
-#list all the combinatios of start position, either by writing them out or through a loop of some kind
-STARTS <- c(0,10,20,30) #extend as needed
 
-yelp_scrape <- function(STARTS) {
-  
-  doc <- read_html(paste0("https://www.yelp.com/biz/wave-broadband-bothell-2?osq=wave%20broadband&start=", STARTS))
-
-   # Review Location
-  review_location <- doc %>% 
-    html_nodes("[class=' responsive-hidden-small__373c0__2vDff border-color--default__373c0__3-ifU']") %>%
-    html_text()
-  review_location[-1]
-  
-  # Review Text
-  review_text <- doc %>% 
-    html_nodes("[class='comment__373c0__1M-px css-n6i4z7']") %>%
-    html_text()
-
-  # Number of stars in review
-  review_date <- doc %>%
-    # html_nodes("[class=' arrange__373c0__2C9bH gutter-1__373c0__2l5bx vertical-align-middle__373c0__1SDTo border-color--default__373c0__3-ifU']") %>%
-    # html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
-    html_nodes("[class=' margin-t1__373c0__oLmO6 margin-b1-5__373c0__2Wblx border-color--default__373c0__3-ifU']") %>%
-    html_text()
-  
-  review_date[str_detect(str_to_lower(review_date), "previous review")] <- NA
-  review_date[!is.na(review_date)]
-  review_date <- as.Date(gsub( ".*(\\d{1,2}/\\d{1,2}/\\d{4}).*", "\\1", review_date), format="%m/%d/%Y")
-  review_date <- review_date[!is.na(review_date)]
-  
-  # Return a tibble
-  # tibble(review_date,
-  #        review_location[2:11],
-  #        review_text) %>% return()
-  
-  # Identify and indicate if a rewview is an update to a previous review
-  # clean_date <- review_date
-  # clean_review <- review_text
-  # for(i in seq_along(clean_date))
-  # {
-  #   if (str_detect(review_date[i],"Previous review") == TRUE)
-  #   {
-  #     bad_date <- i
-  #     clean_date <- review_date[-bad_date]
-  #     clean_review <- review_text[-bad_date]
-  #   } else{"do nothing"}
-  #   if (str_detect(review_date[i],"Updated review") == TRUE)
-  #   {
-  #     clean_date[i] <- str_replace(review_date[i],"Updated review","")
-  #   }else{"do nothing"}
-  # }
-  # 
-  return(data.frame(review_date, review_location[-1], review_text))
-  
-}
-
-yelp_output <- map_dfr(STARTS, yelp_scrape)
-yelp_output %>% View()
-```
 
 
 
