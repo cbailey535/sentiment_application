@@ -1,7 +1,6 @@
 ---
 title: "TEXT DATA ANALYTICS"
 author:  "Chris Bailey"
-# date: '`r Sys.Date()`'
 output: 
   flexdashboard::flex_dashboard:
     theme: cosmo
@@ -39,12 +38,14 @@ library(reshape2)
 library(ggrepel)
 library(grid)
 library(crosstalk)
+library(htmltools)
+library(htmlwidgets)
+library(htmltools)
+library(DT)
 
 theme_set(theme_light())
 mycolors <- c("blue", "#FFC125", "darkgreen", "darkorange")
-```
 
-```{r}
 review <- readr::read_csv('raw_text_consolidated.csv',
                           col_names = TRUE,
                           na = c("", "NA"),
@@ -65,9 +66,7 @@ loughran_data <- readr::read_csv('loughran.csv')
 afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
 my_loughran <- loughran_data %>% filter(sentiment != "superfluous")
 my_lexicon <- afinn_111
-```
 
-```{r}
 review_copy <- review 
 
 review_copy$review <-  gsub("https\\S*", "", review_copy$review)
@@ -112,32 +111,30 @@ sd1 <- SharedData$new(tidy_tweets)
 sd2 <- SharedData$new(review_copy)
 sd3 <- SharedData$new(tidy_tweets)
 sd4 <- SharedData$new(tidy_tweets_copy)
-
 ```
 
 Data {data-icon="fa-database"}
 ==================================================
 
-Sidebar {.sidebar}
+Inputs {.sidebar}
 --------------------------------------------------
 
 ### <font size="5">**Filters**</font>
 
 ```{r}
-f1 <- filter_select("market", "Select Market:", sd, ~market, allLevels = FALSE)
-f11 <- filter_select("brand", "Select Brand:", sd, ~brand, allLevels = FALSE)
-f111 <- filter_select("period", "Select Week(s):", sd, ~week, allLevels = FALSE)
-f1111 <- filter_select("source", "Select Source:", sd, ~src, allLevels = FALSE)
-
-filter_1 <- bscols(
-  list(f1,f11,f111,f1111)
+bscols(widths = c(10,NA,NA),
+  list(
+    filter_select("market", "Select Market:", sd, ~market, allLevels = FALSE),
+    filter_select("brand", " Select Brand:", sd, ~brand, allLevels = FALSE),
+    filter_select("period", "Select Week(s):", sd, ~week, allLevels = FALSE),
+    filter_select("source", "Select Source:", sd, ~src, allLevels = FALSE)
+    )
   )
-
-filter_1
 ```
 
-#### <font size="5">**Date Last Refreshed:**</font>
-#### <font size="5">**```r maxdt```**</font>
+#### <font size="3">**Date Last Refreshed:**</font>
+#### <font size="3">**```r maxdt```**</font>
+
 
 Row {data-height=350}
 --------------------------------------------------
@@ -165,6 +162,7 @@ valueBox(value = "No records to display", icon = "fas fa-comments", color = "war
 ```
 
 ### <font size="5">**Social Media Reviews by Market**</font>
+
 ```{r}
 renderPlotly({
 
@@ -191,6 +189,7 @@ renderPlotly({
 ```
 
 ### <font size="5">**Social Media Reviews by Brand**</font>
+
 ```{r}
 renderPlotly({
 
@@ -217,6 +216,7 @@ renderPlotly({
 ```
 
 ### <font size="5">**Social Media Reviews by Location**</font>
+
 ```{r}
 renderPlotly({
 
@@ -366,7 +366,7 @@ words_by_time <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
   mutate(word_total = sum(n)) %>%
   ungroup() %>%
   rename(count = n) %>%
-  filter(word_total>30)  # nbr of words used at least x times
+  filter(word_total>=20)  # nbr of words used at least x times
 
 shiny::validate(
     shiny::need(nrow(words_by_time) != 0,
@@ -399,7 +399,7 @@ slopes <- nested_models %>%
   mutate(adjusted.p.value = p.adjust(p.value))
 
 top_slopes <- slopes %>%
-  filter(adjusted.p.value<=0.1) %>%
+  filter(adjusted.p.value<=0.2) %>%
   select(-statistic,-p.value)
 
 shiny::validate(
@@ -660,7 +660,7 @@ renderPlot({
                    max.words = 250,
                    title.size = 3,
                    scale=c(7,1))
-  par(las=0)
+  # par(las=0)
 })
 ```
 
@@ -750,7 +750,7 @@ bigram_counts <- bigrams_filtered %>%
   count(word1, word2, sort = TRUE)
 
 bigram_graph <- bigram_counts %>%
-  filter(n>=5) %>%
+  filter(n>=3) %>%
   graph_from_data_frame()
 
 set.seed(2016)
@@ -771,6 +771,7 @@ Recent Reviews {data-icon="far fa-comments"}
 ### <font size="5">**Recent Social Media Reviews and Sentiment Polarity**</font>
 
 ```{r}
+renderDT({
 sentiment_messages_polarity <- tidy_tweets %>%
   # filter(date>=as.Date("2020-01-01")) %>%
   # filter(src != "FaceBook") %>%
@@ -787,7 +788,7 @@ sentiment_messages_polarity <- tidy_tweets %>%
 #Positive (rating 1, 2, or 3)
 #Very Positive (rating 4 or 5)
 
-DT::datatable(sentiment_messages_polarity[,-c(7,8)],
+datatable(sentiment_messages_polarity[,-c(7,8)],
           # caption = "REVIEWS",
           rownames = TRUE,
           colnames = c(
@@ -801,4 +802,34 @@ DT::datatable(sentiment_messages_polarity[,-c(7,8)],
           ),
           filter = "top",
           options = list(pageLength=25))
+
+})
 ```
+
+
+
+
+<!-- # f1 <- filter_select("market", "Select Market:", sd, ~market, allLevels = FALSE) -->
+<!-- # f11 <- filter_select("brand", " Select Brand:", sd, ~brand, allLevels = FALSE) -->
+<!-- # f111 <- filter_select("period", "Select Week(s):", sd, ~week, allLevels = FALSE) -->
+<!-- # f1111 <- filter_select("source", "Select Source:", sd, ~src, allLevels = FALSE) -->
+<!-- #  -->
+<!-- # filter_1 <- bscols(widths = c(NA,NA,NA), -->
+<!-- #   list(f1,f11,f111,f1111) -->
+<!-- #   ) -->
+<!-- #  -->
+<!-- # filter_1 -->
+
+
+<!-- # div( -->
+<!-- #   div(class = "title", -->
+<!-- #       h2("2019 NFL Team Stats & Ratings")), -->
+<!-- #   class = "filtertext", -->
+<!-- #   bscols( -->
+<!-- #     widths = c(3, NA), -->
+<!-- #     list( -->
+<!-- #       f1,f11,f111,f1111 -->
+<!-- #     ) -->
+<!-- #   ), -->
+<!-- #   div(class = "linebreak") -->
+<!-- # ) -->
