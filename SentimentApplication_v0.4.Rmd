@@ -366,7 +366,7 @@ words_by_time <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
   mutate(word_total = sum(n)) %>%
   ungroup() %>%
   rename(count = n) %>%
-  filter(word_total>=20)  # nbr of words used at least x times
+  filter(word_total>=30)  # nbr of words used at least x times
 
 shiny::validate(
     shiny::need(nrow(words_by_time) != 0,
@@ -750,7 +750,7 @@ bigram_counts <- bigrams_filtered %>%
   count(word1, word2, sort = TRUE)
 
 bigram_graph <- bigram_counts %>%
-  filter(n>=3) %>%
+  filter(n>=5) %>%
   graph_from_data_frame()
 
 set.seed(2016)
