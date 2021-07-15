@@ -89,7 +89,8 @@ remove_words <- c("hey",
                   "frontier",
                   "century",
                   "link",
-                  "amongus"
+                  "amongus",
+                  "apparently"
                   )
 
 tidy_tweets <- review_copy %>%
@@ -616,32 +617,32 @@ filter_3
 Row {data-height=450}
 --------------------------------------------------
 
-<!-- ### <font size="5">**Sentiment Drivers**</font> -->
-<!-- ```{r} -->
-<!-- renderPlot({ -->
+### <font size="5">**Sentiment Drivers**</font>
+```{r}
+renderPlot({
 
-<!-- contributions <- sd3$data(withSelection = TRUE, withFilter = TRUE) %>% -->
-<!--   inner_join(my_lexicon, by = "word") %>% -->
-<!--   group_by(word) %>% -->
-<!--   summarize(occurences = n(), -->
-<!--             contribution = sum(value)) -->
+contributions <- sd3$data(withSelection = TRUE, withFilter = TRUE) %>%
+  inner_join(my_lexicon, by = "word") %>%
+  group_by(word) %>%
+  summarize(occurences = n(),
+            contribution = sum(value))
 
-<!-- shiny::validate( -->
-<!--     shiny::need(nrow(contributions) != 0, -->
-<!--          "Oh snap!  No results due to insufficient data.") -->
-<!--   ) -->
-<!--   contributions -->
+shiny::validate(
+    shiny::need(nrow(contributions) != 0,
+         "Oh snap!  No results due to insufficient data.")
+  )
+  contributions
 
 
-<!-- contributions %>% -->
-<!--   top_n(16, abs(contribution)) %>% -->
-<!--   mutate(word = reorder(word, contribution)) %>% -->
-<!--   ggplot(aes(word, contribution, fill = contribution > 0)) + -->
-<!--   geom_col(show.legend = FALSE) + -->
-<!--   theme(text = element_text(size=20)) + -->
-<!--   coord_flip() -->
-<!-- }) -->
-<!-- ``` -->
+contributions %>%
+  top_n(16, abs(contribution)) %>%
+  mutate(word = reorder(word, contribution)) %>%
+  ggplot(aes(word, contribution, fill = contribution > 0)) +
+  geom_col(show.legend = FALSE) +
+  theme(text = element_text(size=20)) +
+  coord_flip()
+})
+```
 
 ### <font size="5">**Sentiment Driver Word Cloud**</font>
 ```{r}
@@ -672,6 +673,7 @@ Row {data-height=450}
 
 ### <font size="5">**Average Sentiment Score by Day**</font>
 ```{r}
+
 sentiment_messages <- tidy_tweets %>%
   filter(brand %in% c("Wave","Xfinity","CenturyLink","ATT","Ziply")) %>%
   inner_join(my_lexicon, by = "word") %>%
@@ -685,19 +687,21 @@ p2 <- sentiment_messages %>%
   group_by(created_at, brand) %>%
   arrange(brand,as.Date(created_at)) %>%
   ggplot(aes(created_at, sentiment, fill = sentiment>0)) +
-  geom_col(alpha = 0.8) +
+  geom_col(alpha = 0.7, na.rm = TRUE) +
+ # geom_area(na.rm = TRUE, alpha = 0.3, outline.type = "both") +
   # scale_colour_manual(name = 'Sentiment > 0', values = setNames(c('green','red'),c(T, F))) +
   # geom_line(show.legend = FALSE) +
   theme(legend.position = "none", text = element_text(size=12),
-        axis.text.x=element_text(angle=60, hjust=1),
+        axis.text.x=element_text(angle=0, hjust=1),
         legend.text = element_text(size=rel(1)),
         legend.key.width = unit(1.5, "cm"),
         axis.title.x=element_blank(),
         strip.background = element_rect(fill = "blue"),
         strip.text = element_text(size = 14)) +
-  scale_x_date(date_breaks = "1 week", date_labels = "W%") +
+  scale_x_date(labels = function(x) format(x, "%d-%b")) +
   facet_wrap(~brand, scales = "free")
 ggplotly(p2, tooltip = c("date","sentiment"), dynamicTicks = TRUE)
+
 ```
 
 Word Network {data-icon="fa-connectdevelop"}
@@ -772,7 +776,8 @@ Recent Reviews {data-icon="far fa-comments"}
 
 ```{r}
 renderDT({
-sentiment_messages_polarity <- tidy_tweets %>%
+  
+  sentiment_messages_polarity <- tidy_tweets %>%
   # filter(date>=as.Date("2020-01-01")) %>%
   # filter(src != "FaceBook") %>%
   inner_join(my_lexicon, by = "word") %>%
@@ -788,7 +793,7 @@ sentiment_messages_polarity <- tidy_tweets %>%
 #Positive (rating 1, 2, or 3)
 #Very Positive (rating 4 or 5)
 
-datatable(sentiment_messages_polarity[,-c(7,8)],
+DT::datatable(sentiment_messages_polarity[,-c(7,8)],
           # caption = "REVIEWS",
           rownames = TRUE,
           colnames = c(
@@ -801,7 +806,11 @@ datatable(sentiment_messages_polarity[,-c(7,8)],
             "SOURCE" = "src"
           ),
           filter = "top",
-          options = list(pageLength=25))
+          options = list(
+            pageLength=25, 
+            scrollY = '800px',
+            pageLength = 1000,
+            autoWidth=TRUE))
 
 })
 ```
