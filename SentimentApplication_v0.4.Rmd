@@ -64,7 +64,7 @@ review <- review %>% filter(created_at>="2021-01-01")
 maxdt <- max(review$created_at)
 loughran_data <- readr::read_csv('loughran.csv')
 afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
-my_loughran <- loughran_data %>% filter(sentiment != "superfluous")
+my_loughran <- loughran_data %>% filter(sentiment %in% c("positive","negative"))
 my_lexicon <- afinn_111
 
 review_copy <- review 
@@ -263,7 +263,7 @@ renderPlot({
     geom_point(size = 3) +
     geom_line(size = 1) +
     geom_area(alpha = 0.2) +
-    facet_wrap(~brand, scales = "free") +
+    facet_wrap(~brand) +
     expand_limits(y=0) +
     #scale_y_continuous(limits = c(0,100)) +
     labs(title = "Count of Reviews by Brand",
@@ -400,7 +400,7 @@ slopes <- nested_models %>%
   mutate(adjusted.p.value = p.adjust(p.value))
 
 top_slopes <- slopes %>%
-  filter(adjusted.p.value<=0.2) %>%
+  filter(adjusted.p.value<=0.1) %>%
   select(-statistic,-p.value)
 
 shiny::validate(
@@ -655,12 +655,18 @@ renderPlot({
   inner_join(my_loughran) %>%
   count(word, sentiment, sort = TRUE) %>%
   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-  comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"),
-                   colors = c("green", "orange", "red", "blue", "black"),
+  comparison.cloud(title.colors=c("red","green"),
+                   colors = c("red","green"),
                    title.bg.colors=c("grey90"),
-                   max.words = 250,
-                   title.size = 3,
+                   max.words = 100,
+                   title.size = 5,
                    scale=c(7,1))
+  # comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"),
+  #                  colors = c("green", "orange", "red", "blue", "black"),
+  #                  title.bg.colors=c("grey90"),
+  #                  max.words = 250,
+  #                  title.size = 3,
+  #                  scale=c(7,1))
   # par(las=0)
 })
 ```
@@ -686,7 +692,7 @@ sentiment_messages <- tidy_tweets %>%
 p2 <- sentiment_messages %>%
   group_by(created_at, brand) %>%
   arrange(brand,as.Date(created_at)) %>%
-  ggplot(aes(created_at, sentiment, fill = sentiment>0)) +
+  ggplot(aes(created_at, sentiment, fill = sentiment>0, rm.na = TRUE)) +
   geom_col(alpha = 0.7, na.rm = TRUE) +
  # geom_area(na.rm = TRUE, alpha = 0.3, outline.type = "both") +
   # scale_colour_manual(name = 'Sentiment > 0', values = setNames(c('green','red'),c(T, F))) +
@@ -764,7 +770,7 @@ a <- grid::arrow(type = "open",
                  ends = "last")
 ggraph(bigram_graph, layout = "fr") +
   geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour="royalblue") +
-  geom_node_point(color = "lightblue", size = 6) +
+  geom_node_point(color = "blue", size = 6) +
   geom_node_text(aes(label = name), size=6, vjust = 1, hjust = 1, repel=FALSE, point.padding = unit(0.2, "lines"))
 })
 ```
