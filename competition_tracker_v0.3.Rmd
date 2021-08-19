@@ -1,0 +1,1324 @@
+---
+title: "Wave North Competitive Alert Tool"
+resource_files:
+- ziply_ovrbld_extract_v2.xlsx
+- leaflet_markers.xlsx
+- ziply_co_markers.xlsx
+- newbuild_markers.xlsx
+- penetration_xref.xlsx
+- char_zips.shp
+- char_zips.shx
+- char_zips.dbf
+- char_zips.prj
+- ziply_fiber_hp.xlsx
+output:
+  flexdashboard::flex_dashboard:
+    #orientation: rows
+    theme: cosmo
+    #vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+# LOAD PACKAGES
+library(flexdashboard)
+library(shiny)
+library(shinythemes)
+library(knitr)
+library(DT)
+library(sp)
+library(readxl)
+library(tidyverse)
+library(tidyquant)
+library(scales)
+library(crosstalk)
+library(htmlwidgets)
+library(maptools)
+library(tigris)
+library(leaflet)
+library(anomalize)
+library(ggplot2)
+library(plotly)
+library(gtrendsR)
+library(reshape2)
+library(rtweet)
+library(rvest)
+
+# LOAD AND PROCESS DATA
+data_raw <- read_excel("ziply_ovrbld_extract_v2.xlsx") %>% janitor::clean_names() %>%
+  filter(year=="Y2021")
+
+data_clean <- data_raw %>%
+    mutate(zip_cd = as.numeric(str_extract_all(zip, "[0-9]+"[[1]])),
+         zip_cd = as.factor(zip_cd),
+         date = as.Date(date_day, tryFormats = c("%Y-%m-%d")),
+         month = months(date),
+         year = as.numeric(str_extract_all(year, "[0-9]+"[[1]])),
+         year = as.Date(as.yearmon(year)),
+         year = format(year, "%Y"),
+         year_mo = paste(month,year, sep = "-"),
+         sales = replace_na(sales,0),
+         connects = replace_na(gross_connects,0),
+         involuntary_discos = replace_na(involuntary_disconnects,0),
+         involuntary_pending_discos = replace_na(involuntary_pending_disconnects,0),
+         new_pending_discos = replace_na(new_pending_disconnects,0),
+         total_discos = replace_na(total_disconnects,0),
+         seasonal_discos = replace_na(seasonal_disconnects,0),
+         voluntary_discos = replace_na(voluntary_disconnects,0),
+         voluntary_pending_discos = replace_na(voluntary_pending_disconnects,0),
+         net_activations = replace_na(net_activations,0),
+         channel_category = case_when(
+             str_detect(channel_category, "Telesales") ~ "CALLCTR",
+             str_detect(channel_category, "Customer Service") ~ "CALLCTR",
+             str_detect(channel_category, "Direct Sales") ~ "DSR",
+             str_detect(channel_category, "Front Counter") ~ "RSR",
+             str_detect(channel_category, "eCommerce") ~ "ECOMM",
+             TRUE ~ "OTHER")
+         ) %>%
+  group_by(channel_category, zip, zip_cd, date) %>%
+  summarize(sales = sum(sales),
+            total_discos = sum(total_discos),
+            voluntary_discos = sum(voluntary_discos),
+            involuntary_discos = sum(involuntary_discos),
+            net_activations = sum(net_activations)
+            ) %>%
+  group_by(channel_category, zip, zip_cd, date)
+
+penetration_df <- read_excel("penetration_xref.xlsx", sheet = "penetration") %>% 
+  janitor::clean_names() %>%
+  mutate(zip_cd = as.factor(zip_cd))
+
+data_clean <- left_join(data_clean,penetration_df, by="zip_cd")
+
+char_zips <- sf::st_read("char_zips.shp")
+
+markers_df <- read_excel("leaflet_markers.xlsx") %>% janitor::clean_names()
+
+ziply_fiber_hp <- read_excel("ziply_fiber_hp.xlsx") %>% janitor::clean_names()
+
+ziply_co_markers_df <- read_excel("ziply_co_markers.xlsx") %>% janitor::clean_names()
+
+newbuild_markers_df <- read_excel("newbuild_markers.xlsx") %>% janitor::clean_names() %>% mutate_at(vars(cost_per_home,total_cost), funs(. %>% round(0) %>% scales::dollar()))
+
+sd <- SharedData$new(data_clean)
+
+# token <- create_token(
+#   app = 'marketingguy_text_mining',
+#   consumer_key = 'ReFDEfRS2s2jNbVIsNtU8rhEA',
+#   consumer_secret = 'nWWIPUlFAPQxeK688pw45pu541BJVHmZLa1mU0haBZV2zIUqqo',
+#   access_token = '18102142-on6G71rQMJm7wr4MoiW83jko8s5nFB7iuZGoZxupZ',
+#   access_secret = '84Z3Ab3uP7nQSdMn52tJXC64JZZG8mxD9ViBG4jsjnFjY')
+# 
+# tweets <- search_tweets("@WaveConnects OR @gowave_g OR @ZiplyFiber", n = 10000,  include_rts = FALSE, retryonratelimit = TRUE)
+# tweets$created_at <- format(tweets$created_at, format= "%Y-%m-%dT%H:%M:%S.000")
+# 
+# write_as_csv(tweets, "C:\\Temp\\wave_kpi\\ZiplyTwitter.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+
+# Load data
+data <- read_csv("ZiplyTwitter.csv") %>%
+  as_tibble(data) %>%
+  mutate(date = as.Date(created_at))
+
+# References:
+# https://www.latlong.net/
+# http://www.sthda.com/english/wiki/ggplot2-barplots-quick-start-guide-r-software-and-data-visualization
+```
+
+Sidebar {.sidebar}
+===================================================
+
+### <font size="3">**Filter**</font> 
+
+```{r}
+# filter_select(
+#   id = "city",
+#   label = "Select Single or Multiple Cities:",
+#   sharedData = sd,
+#   group = ~zip,
+#   multiple = TRUE
+# )
+
+filter_select(
+  id = "city",
+  label = "Select Single or Multiple Cities:",
+  sharedData = sd,
+  group = ~zip
+)
+```
+
+"Empty filter box will display all cities."
+
+###### Data Updated Through **```r data_clean %>% ungroup() %>% select(date) %>% summarize(date = max(as.Date(date)))```**
+
+Driver Analysis {data-icon="fa-chart-bar"}
+==================================================
+
+Column
+-----------------------------------------------------------------------
+
+### <font size="3">**Customer Net Change (since Jan. 1, 2021)**</font> {data-width=700}
+
+```{r, include=TRUE}
+renderLeaflet({
+  
+  df6 <- geo_join(char_zips,
+                      sd$data(withSelection = TRUE, withFilter = TRUE),
+                      by_sp = "GEOID10",
+                      by_df = "zip_cd",
+                      how = "inner") 
+    
+  df6 <- df6 %>%
+    group_by(zip) %>%
+    summarize(sales = sum(sales),
+              net_activations = sum(net_activations),
+              penetration = mean(penetration)) %>%
+    group_by(zip)
+  
+  minVal <- min(df6$net_activations, na.rm = TRUE)
+  maxVal <- max(df6$net_activations, na.rm = TRUE)
+  domain <- c(minVal,maxVal)
+
+  colorPal <- c(colorRampPalette(colors = c("#b2182b", "white"), space = "Lab")(abs(minVal)),
+                colorRampPalette(colors = c("white", "#008000"), space = "Lab")(maxVal))
+  
+  # ziplyIcon <- makeIcon(
+  #   iconUrl = "https://get.ziplyfiber.com/sites/default/files/logo.png",
+  #   iconWidth = 94,
+  #   iconHeight = 44,
+  #   iconAnchorX = 0,
+  #   iconAnchorY = 0
+  # )
+
+  # icons <- awesomeIcons(
+  # icon = 'dollar',
+  # iconColor = 'orange',
+  # markerColor = "black",
+  # library = 'fa')
+  
+  icons <- awesomeIcons(
+  icon = 'exclamation-circle',
+  iconColor = '#DFFF00',
+  markerColor = "red",
+  library = 'fa')
+  
+ 
+  
+  # minvalue <- floor(min(df6$net_activations, na.rm = TRUE))
+  # maxvalue <- ceiling(max(df6$net_activations, na.rm = TRUE))
+  
+  # pal <- colorNumeric(
+  #   palette = "RdYlBu",
+  #   domain = df6$net_activations,
+  #   na.color = "#909090")
+  
+  # pal_legend <- colorBin(
+  #   palette = "RdYlBu",
+  #   domain = df6$net_activations,
+  #   # bins = seq(minvalue, max(df6$net_activations, na.rm = TRUE) + 50, by = 50),
+  #   bins = seq(minVal, max(df6$net_activations, na.rm = TRUE) + 50, by = 50),
+  #   na.color = "#909090")
+
+  labels <- paste0(
+    "<strong> City: </strong>",
+    df6$zip, "<br/>",
+    # "<strong> Zip: </strong>",
+    #   df6$GEOID10, "<br/>",
+    "<strong> YTD Net Activations: </strong>",
+      df6$net_activations, "<br/>",
+    "<strong> Penetration: </strong>",
+      percent(df6$penetration, accuracy = 0.1), "<br/>"
+    # sprintf(
+    # "<strong>%s</strong><br/>%s",
+    #  "<strong> Penetration %: </strong>",  
+    # prettyNum(df6$penetration,  digits = 2))
+    ) %>%
+    lapply(htmltools::HTML)
+  
+  marker_label <- paste0(
+    "<strong> Provider: </strong>",
+      markers_df$provider, "<br/>",
+    "<strong> Fiber Svc Address: </strong>",
+      markers_df$address, "<br/>",
+    "<strong> City: </strong>",
+      markers_df$city, "<br/>",
+    "<strong> State: </strong>",
+      markers_df$state, "<br/>",
+    "<strong> Zip: </strong>",
+      markers_df$zip, "<br/>",
+    "<strong> Ziply Serviceable: </strong>",
+      markers_df$ziply_svc, "<br/>",
+    "<strong> Wave Serviceable: </strong>",
+      markers_df$wave_svc, "<br/>",
+    "<strong> Wave Node: </strong>",
+      markers_df$wave_node, "<br/>"
+    ) %>%
+    lapply(htmltools::HTML)
+  
+ ziply_co_marker_label <- paste0(
+    "<strong> Provider: </strong>",
+      ziply_co_markers_df$provider, "<br/>",
+    "<strong> Site Name: </strong>",
+      ziply_co_markers_df$name, "<br/>",
+    "<strong> Location Type: </strong>",
+      ziply_co_markers_df$type, "<br/>",
+    "<strong> CLLI: </strong>",
+      ziply_co_markers_df$clli, "<br/>",
+    "<strong> Address: </strong>",
+      ziply_co_markers_df$address, "<br/>",
+    "<strong> City: </strong>",
+      ziply_co_markers_df$city, "<br/>",
+    "<strong> State: </strong>",
+    ziply_co_markers_df$state, "<br/>",
+    "<strong> Zip: </strong>",
+      ziply_co_markers_df$zip, "<br/>"
+    ) %>%
+    lapply(htmltools::HTML)
+ 
+ # newbuild_marker_label <- paste0(
+ #    "<strong> Project Name: </strong>",
+ #      newbuild_markers_df$address, "<br/>",
+ #    "<strong> Location: </strong>",
+ #      newbuild_markers_df$city, "<br/>",
+ #    "<strong> Homes: </strong>",
+ #      newbuild_markers_df$resi_homes, "<br/>",
+ #    "<strong> Project Cost: </strong>",
+ #      newbuild_markers_df$total_cost, "<br/>",
+ #    "<strong> Cost per Home: </strong>",
+ #      newbuild_markers_df$cost_per_home, "<br/>",
+ #    "<strong> Competitor: </strong>",
+ #      newbuild_markers_df$competitor, "<br/>"
+ #    ) %>%
+ #    lapply(htmltools::HTML)
+ 
+ ziply_marker_label <- paste0(
+    "<strong> Provider: </strong>",
+      ziply_fiber_hp$provider, "<br/>",
+    "<strong> Fiber Svc Address: </strong>",
+      ziply_fiber_hp$address, "<br/>",
+    "<strong> City: </strong>",
+      ziply_fiber_hp$city, "<br/>",
+    "<strong> State: </strong>",
+      ziply_fiber_hp$state, "<br/>",
+    "<strong> Zip: </strong>",
+      ziply_fiber_hp$zip, "<br/>",
+    "<strong> Ziply Serviceable: </strong>",
+      ziply_fiber_hp$ziply_svc, "<br/>",
+    "<strong> Wave Serviceable: </strong>",
+      ziply_fiber_hp$wave_svc, "<br/>",
+    "<strong> Wave Node: </strong>",
+      ziply_fiber_hp$wave_node, "<br/>"
+    ) %>%
+    lapply(htmltools::HTML)
+
+  leaflet(df6) %>%
+    setView(lng= -122.3707 , lat = 48.2412, zoom=9) %>%
+  #names(providers)...lists all provider tiles
+  # addProviderTiles("CartoDB.Positron") %>%
+  addProviderTiles("OpenStreetMap") %>%
+  # addProviderTiles("Esri.WorldTopoMap") %>%
+  #addProviderTiles("Esri.WorldImagery") %>%
+  # add zip codes
+  addPolygons(
+              # fillColor = ~pal(net_activations),
+              fillColor = ~ get('colorBin')(colorPal, domain)(net_activations),
+              weight = 2,
+              opacity = 1,
+              color = "#03F",
+              # dashArray = "3",
+              fillOpacity = 0.5,
+              highlight = highlightOptions(
+        color = "black",
+        bringToFront = TRUE
+      ),
+              label = labels,
+              # options = pathOptions(clickable = T)) %>%
+              options = pathOptions(interactive = T)) %>%
+  addLegend(
+    "topright",
+      # pal = pal, values = ~net_gain,
+      pal = colorBin(colorPal, domain = domain+1),
+      values = domain,
+      opacity = 0.9,
+      title = "Current YTD Net Gain"
+    ) %>%
+  addCircleMarkers(data = ziply_co_markers_df,
+             label = ziply_co_marker_label,
+             stroke = TRUE,
+             color = "#ff0032",
+             weight = 5,
+             opacity = 0.5,
+             radius = 15,
+             clusterOptions = markerClusterOptions()) %>%
+  # addAwesomeMarkers(data = newbuild_markers_df,
+  #                   label = newbuild_marker_label,
+  #                   icon = icons,
+  #                   lng = ~lon,
+  #                   lat = ~lat) %>%
+  addAwesomeMarkers(data = ziply_fiber_hp,
+                    label = ziply_marker_label,
+                    icon = icons,
+                    lng = ~lon,
+                    lat = ~lat) %>%
+  addCircles(data = markers_df,
+             label = marker_label,
+             lng = ~lon,
+             lat = ~lat,
+             radius = 10)
+  })
+```
+
+Column {data-width=400}
+-------------------------------------
+
+<!-- ### <font size="3">**Sales**</font>  -->
+
+<!-- ```{r, include=TRUE} -->
+<!-- renderPlot({ -->
+<!--     df1 <- sd$data(withSelection = TRUE, withFilter = TRUE) %>% -->
+<!--       # ungroup() %>% -->
+<!--       select(-channel_category) %>% -->
+<!--       group_by(date) %>% -->
+<!--       arrange(date) -->
+
+<!--     df1 <- aggregate(df1["sales"], by=df1["date"], sum) -->
+
+<!--     ggplot(df1, -->
+<!--            mapping = aes(x=date, y=sales)) + -->
+<!--     # geom_line(alpha = 0.4, size = 0.5) + -->
+<!--     geom_ma(ma_fun = SMA, n = 7, color = "blue", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_smooth(method = "loess", se = FALSE, color = "darkgreen", alpha = 0.3, size = 1, span = 0.2) + -->
+<!--     theme(text = element_text(size=16)) + -->
+<!--     theme_tq() + -->
+<!--     labs(subtitle = "7-day SMA(blue), 30-day SMA(red), Loess Smooth(green)", -->
+<!--        x = "Date", -->
+<!--        y = "Sales" -->
+<!--     ) + -->
+<!--     scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) -->
+<!-- }) -->
+<!-- ``` -->
+
+### <font size="3">**Weekly Sales**</font>
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  weekly_sales <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    select(-channel_category) %>%
+    # filter(sales_chl=="Call Center") %>%
+    filter(date>= "2021-01-01") %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(sales = sum(sales)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(sales, 1),
+           growth = sales - previous,
+           chg_pct = growth/previous) %>%
+    mutate(
+    text = paste("Week: ", week, "\nSales: ", sales, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(weekly_sales,
+           mapping = aes(x=as.Date(week), y=sales, text=text, fill = growth>0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),sales), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Sales"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">**Weekly Total Disconnects**</font>
+
+<!-- ```{r, include=TRUE} -->
+<!-- renderPlot({ -->
+<!--     df2 <- sd$data(withSelection = TRUE, withFilter = TRUE) %>% -->
+<!--       # ungroup() %>% -->
+<!--       select(-channel_category) %>% -->
+<!--       group_by(date) %>% -->
+<!--       arrange(date) -->
+
+<!--     df2 <- aggregate(df2["total_discos"], by=df2["date"], sum) -->
+
+<!--     ggplot(df2, -->
+<!--            mapping = aes(x=as.Date(date), y=total_discos)) + -->
+<!--     # geom_line(alpha = 0.4, size = 0.5) + -->
+<!--     geom_ma(ma_fun = SMA, n = 7, color = "blue", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_smooth(method = "loess", se = FALSE, color = "darkgreen", alpha = 0.3, size = 1, span = 0.2) + -->
+<!--     theme(text = element_text(size=16)) + -->
+<!--     theme_tq() + -->
+<!--     labs(subtitle = "7-day SMA(blue), 30-day SMA(red), Loess Smooth(green)", -->
+<!--        x = "Date", -->
+<!--        y = "Total Discos" -->
+<!--     ) + -->
+<!--     scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) -->
+<!-- }) -->
+<!-- ``` -->
+
+<!-- ### <font size="5">**Weekly Disconnects**</font> -->
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  weekly_discos <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    select(-channel_category) %>%
+    # filter(sales_chl=="Call Center") %>%
+    filter(date>= "2021-01-01") %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(discos = sum(total_discos)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(discos, 1),
+           growth = discos - previous,
+           chg_pct = growth/previous) %>%
+    mutate(
+    text = paste("Week: ", week, "\nDiscos: ", discos, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(weekly_discos,
+           mapping = aes(x=as.Date(week), y=discos, text=text, fill = growth<0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),discos), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Total Discos"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">**Weekly Voluntary Discos**</font>
+
+<!-- ```{r, include=TRUE} -->
+<!-- renderPlot({ -->
+<!--     df3 <- sd$data(withSelection = TRUE, withFilter = TRUE) %>% -->
+<!--       # ungroup() %>% -->
+<!--       select(-channel_category) %>% -->
+<!--       group_by(date) %>% -->
+<!--       arrange(date) -->
+
+<!--     df3 <- aggregate(df3["voluntary_discos"], by=df3["date"], sum) -->
+
+<!--     ggplot(df3, -->
+<!--            mapping = aes(x=as.Date(date), y=voluntary_discos)) + -->
+<!--     # geom_line(alpha = 0.4, size = 0.5) + -->
+<!--     geom_ma(ma_fun = SMA, n = 7, color = "blue", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_smooth(method = "loess", se = FALSE, color = "darkgreen", alpha = 0.3, size = 1, span = 0.2) + -->
+<!--     theme(text = element_text(size=16)) + -->
+<!--     theme_tq() + -->
+<!--     labs(subtitle = "7-day SMA(blue), 30-day SMA(red), Loess Smooth(green)", -->
+<!--        x = "Date", -->
+<!--        y = "Voluntary Discos" -->
+<!--     ) + -->
+<!--     scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) -->
+<!-- }) -->
+<!-- ``` -->
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  weekly_vol <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    select(-channel_category) %>%
+    # filter(sales_chl=="Call Center") %>%
+    filter(date>= "2021-01-01") %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(vol_discos = sum(voluntary_discos)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(vol_discos, 1),
+           growth = vol_discos - previous,
+           chg_pct = growth/previous) %>%
+    mutate(
+    text = paste("Week: ", week, "\nVoluntary Discos: ", vol_discos, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(weekly_vol,
+           mapping = aes(x=as.Date(week), y=vol_discos, text=text, fill = growth<0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),vol_discos), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Voluntary Discos"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">**Weekly Involuntary Discos**</font>
+
+<!-- ```{r, include=TRUE} -->
+<!-- renderPlot({ -->
+<!--     df4 <- sd$data(withSelection = TRUE, withFilter = TRUE) %>% -->
+<!--       # ungroup() %>% -->
+<!--       select(-channel_category) %>% -->
+<!--       group_by(date) %>% -->
+<!--       arrange(date) -->
+
+<!--     df4 <- aggregate(df4["involuntary_discos"], by=df4["date"], sum) -->
+
+<!--     ggplot(df4, -->
+<!--            mapping = aes(x=as.Date(date), y=involuntary_discos)) + -->
+<!--     # geom_line(alpha = 0.4, size = 0.5) + -->
+<!--     geom_ma(ma_fun = SMA, n = 7, color = "blue", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) + -->
+<!--     geom_smooth(method = "loess", se = FALSE, color = "darkgreen", alpha = 0.3, size = 1, span = 0.2) + -->
+<!--     theme(text = element_text(size=16)) + -->
+<!--     theme_tq() + -->
+<!--     labs(subtitle = "7-day SMA(blue), 30-day SMA(red), Loess Smooth(green)", -->
+<!--        x = "Date", -->
+<!--        y = "Non-Pay Discos" -->
+<!--     ) + -->
+<!--     scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) -->
+<!-- }) -->
+<!-- ``` -->
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  weekly_invol <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    select(-channel_category) %>%
+    # filter(sales_chl=="Call Center") %>%
+    filter(date>= "2021-01-01") %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(invol_discos = sum(involuntary_discos)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(invol_discos, 1),
+           growth = invol_discos - previous,
+           chg_pct = growth/previous) %>%
+    mutate(
+    text = paste("Week: ", week, "\nInvoluntary Discos: ", invol_discos, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(weekly_invol,
+           mapping = aes(x=as.Date(week), y=invol_discos, text=text, fill = growth<0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),invol_discos), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Involuntary Discos"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">**YTD Cumulative Customer Net Activations**</font>
+
+```{r, include=TRUE}
+renderPlot({
+    df5 <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+      # ungroup() %>%
+      select(-channel_category) %>%
+      group_by(date) %>%
+      arrange(date) 
+
+    df5 <- aggregate(df5["net_activations"], by=df5["date"], sum)
+
+    ggplot(df5,
+           mapping = aes(x=as.Date(date), y=cumsum(net_activations))) +
+    geom_line(size = 1.5, color = "blue", alpha = 0.6) +
+    geom_area(alpha = 0.1, fill="blue") +
+    # geom_ma(ma_fun = SMA, n = 7, color = "blue", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) +
+    # geom_ma(ma_fun = SMA, n = 30, color = "red", size = 1.1, na.rm = TRUE, linetype=1, alpha = 0.7) +
+    theme(text = element_text(size=16)) +
+    theme_tq() +
+    labs(subtitle = "YTD Cumulative Net Change in Customers",
+      x = "Date",
+      y = "Net Activations"
+    ) +
+   scale_x_date(breaks = "1 month", labels = date_format("%b-%y"))
+})
+```
+
+Sales Performance by Channel {data-icon="fa-chart-pie"}
+==================================================
+
+Column
+-----------------------------------------------------------------------
+
+### <font size="3">**Direct Sales**</font>
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  dsr_sales <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "DSR") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(sales = sum(sales)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(sales, 1),
+           growth = sales - previous,
+           chg_pct = growth/previous,
+           per_day = sales/7) %>%
+    mutate(
+    text = paste("Week: ", week, "\nSales: ", sales, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(dsr_sales,
+           mapping = aes(x=as.Date(week), y=sales, text=text, fill = growth>0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),sales), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Sales"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">DSR YTD Sales</font>
+
+```{r}
+renderValueBox({
+
+  dsr_ytd <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "DSR") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    group_by(channel_category) %>%
+    summarize(sales = sum(sales)) 
+  
+  value <- sum(dsr_ytd$sales)
+
+  valueBox(value = format(value, nsmall = 0, big.mark = ","), color = "primary")
+
+})
+```
+
+### <font size="3">**Telesales & Customer Service**</font>
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  callctr_sales <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "CALLCTR") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(sales = sum(sales)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(sales, 1),
+           growth = sales - previous,
+           chg_pct = growth/previous,
+           per_day = sales/7) %>%
+    mutate(
+    text = paste("Week: ", week, "\nSales: ", sales, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(callctr_sales,
+           mapping = aes(x=as.Date(week), y=sales, text=text, fill = growth>0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),sales), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Sales"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">Call Center YTD Sales</font>
+
+```{r}
+renderValueBox({
+
+  callctr_ytd <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "CALLCTR") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    group_by(channel_category) %>%
+    summarize(sales = sum(sales)) 
+  
+  value <- sum(callctr_ytd$sales)
+
+  valueBox(value = format(value, nsmall = 0, big.mark = ","), color = "primary")
+
+})
+```
+
+Column
+-----------------------------------------------------------------------
+
+### <font size="3">**Retail**</font>
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  rsr_sales <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "RSR") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(sales = sum(sales)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(sales, 1),
+           growth = sales - previous,
+           chg_pct = growth/previous,
+           per_day = sales/7) %>%
+    mutate(
+    text = paste("Week: ", week, "\nSales: ", sales, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(rsr_sales,
+           mapping = aes(x=as.Date(week), y=sales, text=text, fill = growth>0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),sales), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Sales"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">Retail YTD Sales</font>
+
+```{r}
+renderValueBox({
+
+  rsr_ytd <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "RSR") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    group_by(channel_category) %>%
+    summarize(sales = sum(sales)) 
+  
+  value <- sum(rsr_ytd$sales)
+
+  valueBox(value = format(value, nsmall = 0, big.mark = ","), color = "primary")
+
+})
+```
+
+### <font size="3">**eCommerce**</font>
+
+```{r, include=TRUE}
+renderPlotly({
+  
+  ecom_sales <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "ECOMM") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    mutate(week = floor_date(date, unit = "week", week_start = 7)) %>%
+    # group_by(date_day) %>%
+    group_by(week) %>%
+    summarize(sales = sum(sales)) %>%
+    # arrange(date_day)
+    arrange(week) %>%
+    mutate(previous = lag(sales, 1),
+           growth = sales - previous,
+           chg_pct = growth/previous,
+           per_day = sales/7) %>%
+    mutate(
+    text = paste("Week: ", week, "\nSales: ", sales, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="")
+    ) %>%
+    filter(!is.na(growth))
+  
+  p <- ggplot(ecom_sales,
+           mapping = aes(x=as.Date(week), y=sales, text=text, fill = growth>0)) + 
+    geom_col(color = "white", alpha = 0.8) +
+    geom_smooth(inherit.aes = FALSE, aes(as.Date(week),sales), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) +
+    theme_bw() +
+  theme(
+        axis.text.x = element_text(angle = 0, vjust=0.5, size=8),
+        axis.text.y = element_text(size=8),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color= "gray90", size=0.5),
+        legend.position = "none",
+        strip.background = element_rect(fill="blue"),
+        strip.text = element_text(color = "white", face = "bold", size = 12)
+        ) +
+    labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume",
+       x = "Date",
+       y = "Sales"
+    ) +
+    scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) +
+    scale_y_continuous(labels = scales::comma)
+  
+ggplotly(p, tooltip = c("text"))
+  
+  })
+```
+
+### <font size="3">eCom YTD Sales</font>
+
+```{r}
+renderValueBox({
+
+  ecom_ytd <- sd$data(withSelection = TRUE, withFilter = TRUE) %>%
+    ungroup() %>%
+    filter(channel_category == "ECOMM") %>%
+    filter(date>= "2021-01-01") %>%
+    select(channel_category, date, sales) %>%
+    group_by(channel_category) %>%
+    summarize(sales = sum(sales)) 
+  
+  value <- sum(ecom_ytd$sales)
+
+  valueBox(value = format(value, nsmall = 0, big.mark = ","), color = "primary")
+
+})
+```
+
+<!-- Column -->
+<!-- ----------------------------------------------------------------------- -->
+
+<!-- ### <font size="3">**Other**</font> -->
+
+<!-- ```{r, include=TRUE} -->
+<!-- renderPlotly({ -->
+
+<!--   other_sales <- sd$data(withSelection = TRUE, withFilter = TRUE) %>% -->
+<!--     ungroup() %>% -->
+<!--     filter(channel_category == "OTHER") %>% -->
+<!--     filter(date>= "2021-01-01") %>% -->
+<!--     select(channel_category, date, sales) %>% -->
+<!--     mutate(week = floor_date(date, unit = "week", week_start = 1)) %>% -->
+<!--     # group_by(date_day) %>% -->
+<!--     group_by(week) %>% -->
+<!--     summarize(sales = sum(sales)) %>% -->
+<!--     # arrange(date_day) -->
+<!--     arrange(week) %>% -->
+<!--     mutate(previous = lag(sales, 1), -->
+<!--            growth = sales - previous, -->
+<!--            chg_pct = growth/previous, -->
+<!--            per_day = sales/7) %>% -->
+<!--     mutate( -->
+<!--     text = paste("Week: ", week, "\nSales: ", sales, "\nWoW Change: ", growth, "\n%-Chg.: ", percent(chg_pct, accuracy = 0.1), sep="") -->
+<!--     ) %>% -->
+<!--     filter(!is.na(growth)) -->
+
+<!--   p <- ggplot(other_sales, -->
+<!--            mapping = aes(x=as.Date(week), y=sales, text=text, fill = growth>0)) +  -->
+<!--     geom_col(color = "white", alpha = 0.8) + -->
+<!--     geom_smooth(inherit.aes = FALSE, aes(as.Date(week),sales), method = "loess", se = FALSE, color = "blue", size = 0.5, span = 0.3) + -->
+<!--     theme_bw() + -->
+<!--   theme( -->
+<!--         axis.text.x = element_text(angle = 0, vjust=0.5, size=8), -->
+<!--         axis.text.y = element_text(size=8), -->
+<!--         panel.background = element_rect(fill = "white"), -->
+<!--         panel.grid.major = element_line(color= "gray90", size=0.5), -->
+<!--         legend.position = "none", -->
+<!--         strip.background = element_rect(fill="blue"), -->
+<!--         strip.text = element_text(color = "white", face = "bold", size = 12) -->
+<!--         ) + -->
+<!--     labs(subtitle = "Green = increase in week-over-week volume, Red = decrease in volume", -->
+<!--        x = "Date", -->
+<!--        y = "Sales" -->
+<!--     ) + -->
+<!--     scale_x_date(breaks = "1 month", labels = date_format("%b-%y")) + -->
+<!--     scale_y_continuous(labels = scales::comma) -->
+
+<!-- ggplotly(p, tooltip = c("text")) -->
+
+<!--   }) -->
+<!-- ``` -->
+
+<!-- ### <font size="3">Other YTD Sales</font> -->
+
+<!-- ```{r} -->
+<!-- renderValueBox({ -->
+
+<!--   other_ytd <- sd$data(withSelection = TRUE, withFilter = TRUE) %>% -->
+<!--     ungroup() %>% -->
+<!--     filter(channel_category == "OTHER") %>% -->
+<!--     filter(date>= "2021-01-01") %>% -->
+<!--     select(channel_category, date, sales) %>% -->
+<!--     group_by(channel_category) %>% -->
+<!--     summarize(sales = sum(sales))  -->
+
+<!--   value <- sum(other_ytd$sales) -->
+
+<!--   valueBox(value = format(value, nsmall = 0, big.mark = ","), color = "primary") -->
+
+<!-- }) -->
+<!-- ``` -->
+
+<!-- Google Trends {data-icon="fa-google"} -->
+<!-- ================================================== -->
+
+<!-- Column {data-width=600} -->
+<!-- -------------------------------------------------- -->
+
+<!-- ### <font size="3">**Rolling 12-month Google Search Volume - Washington State**</font> -->
+
+<!-- ```{r} -->
+<!-- keywords <- c("ziply") -->
+<!-- country <- c('US-WA') -->
+<!-- #time=("2019-01-01 2018-08-27") -->
+<!-- time <- 'today 12-m' -->
+<!-- channel <- 'web' -->
+<!-- trends <- gtrends(keywords, gprop = channel, geo = country, time = time, onlyInterest = TRUE) -->
+<!-- time_trend <- trends$interest_over_time -->
+<!-- city <- trends$interest_by_city -->
+
+<!-- p10 <- ggplot(data=time_trend, aes(x=date, y=hits,group=keyword,col=keyword))+ -->
+<!--   geom_line(size = 2, alpha = 0.7) + -->
+<!--   xlab('Time') + -->
+<!--   ylab('Relative Interest') + -->
+<!--   #theme_bw()+ -->
+<!--   theme(legend.title = element_blank(), -->
+<!--         legend.position="right", -->
+<!--         legend.text=element_text(size=16), -->
+<!--         axis.text.x = element_text(size=12,color="darkblue"), -->
+<!--         axis.text.y = element_text(size=12,color="darkblue")) -->
+<!--   #ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(p10) -->
+<!-- ``` -->
+
+<!-- Column {data-width=400} -->
+<!-- -------------------------------------------------- -->
+
+<!-- ### <font size="3">**Search Relevance by City**</font> -->
+
+<!-- ```{r} -->
+<!-- p30 <- ggplot(data=city, aes(x=reorder(location,hits), hits, text = paste("City: ", location, -->
+<!--       "<br>Relative Interest: ", hits)))+ -->
+<!--   geom_col(fill = "orange", alpha = 0.7) + -->
+<!--   xlab('') + -->
+<!--   ylab('Relative Interest') + -->
+<!--   coord_flip() + -->
+<!--   theme(legend.title = element_blank(), -->
+<!--         legend.position="bottom", -->
+<!--         legend.text=element_text(size=12), -->
+<!--         axis.text.x = element_text(size=10,color="darkblue"), -->
+<!--         axis.text.y = element_text(size=10,color="darkblue")) + -->
+<!--   ylim(0,NA) -->
+<!--   # theme_minimal() -->
+<!--   # ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(p30, tooltip = "text") -->
+<!-- ``` -->
+
+<!-- ### <font size="3">**Top Related Topics**</font> -->
+
+<!-- ```{r} -->
+<!-- #keywords_related <- "ziply fiber" -->
+<!-- topics = head(gtrends(keywords, gprop = channel,geo=country, onlyInterest = TRUE)$related_topics) -->
+<!-- topics$subject <- as.numeric(topics$subject) %>% na.omit() -->
+<!-- topics <- topics %>% filter(related_topics == "top") -->
+
+<!-- # related = head(gtrends(keywords, gprop = channel,geo=country)$related_queries, n=20) -->
+<!-- # related$subject <- as.numeric(related$subject) %>% na.omit() -->
+<!-- # related <- related %>% filter(related_queries == "top") -->
+
+<!-- p23 <- ggplot(data=topics, aes(x=reorder(value,subject), y=subject, text = paste("Related Topic: ", value, -->
+<!--       "<br>Relative Interest: ", subject)))+ -->
+<!--  geom_col(fill = "orange", alpha = 0.7) + -->
+<!--   xlab('') + -->
+<!--   ylab('Relative Interest') + -->
+<!--   coord_flip() + -->
+<!--   theme(legend.title = element_blank(), -->
+<!--         legend.position="bottom", -->
+<!--         legend.text=element_text(size=12), -->
+<!--         axis.text.x = element_text(size=10,color="darkblue"), -->
+<!--         axis.text.y = element_text(size=10,color="darkblue")) + -->
+<!--   ylim(0,NA) -->
+<!--   # theme_minimal() -->
+<!--   # ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(p23, tooltip = "text") -->
+<!-- ``` -->
+
+<!-- ### <font size="3">**Top Related Queries**</font> -->
+
+<!-- ```{r} -->
+<!-- p29 <- ggplot(data=related, aes(x=reorder(value,subject), y=subject, text = paste("Related Query Term: ", value, -->
+<!--       "<br>Relative Interest: ", subject)))+ -->
+<!--  geom_col(fill = "orange", alpha = 0.7) + -->
+<!--   xlab('') + -->
+<!--   ylab('Relative Interest') + -->
+<!--   coord_flip() + -->
+<!--   theme(legend.title = element_blank(), -->
+<!--         legend.position="bottom", -->
+<!--         legend.text=element_text(size=12), -->
+<!--         axis.text.x = element_text(size=10,color="darkblue"), -->
+<!--         axis.text.y = element_text(size=10,color="darkblue")) + -->
+<!--   ylim(0,NA) -->
+<!--   # theme_minimal() -->
+<!--   #ggtitle("Rolling 12-month Google Search Volume - Washington State") -->
+<!-- ggplotly(p29, tooltip = "text") -->
+<!-- ``` -->
+
+Twitter Trends {data-icon="fa-twitter"}
+==================================================
+
+Column
+--------------------------------------------------
+
+### <font size="3">**Trending Twitter Topics**</font>
+
+```{r}
+data %>%
+  select(date,text,location) %>%
+  # filter(str_detect(text, paste(c("@ZiplyFiber"), collapse = '|'))) %>%
+  # filter(str_detect(location, paste(c("Seattle", ", WA", "WASHINGTON", "KIRKLAND", "The Evergreen State."), collapse = "|"))) %>%
+  arrange(desc(date)) %>%
+  DT::datatable(
+    options = list(pageLength = 25),
+    #caption = "Trending Twitter Topics, Seattle WA",
+    colnames = c(
+      "DATE" = "date",
+      "TWEET" = "text",
+      "LOCATION" = "location"
+      )) %>%
+    formatDate(c('DATE'))
+```
+
+Column
+--------------------------------------------------
+
+### <font size="3">**Frequency of Tweets**</font>
+
+```{r}
+daily_tweets <- data %>%
+  select(date,status_id,text) %>%
+  # filter(str_detect(text, paste(c("@ZiplyFiber"), collapse = '|'))) %>%
+  group_by(date) %>%
+  count()
+
+p12 <-  ggplot(daily_tweets, aes(as.Date(date),n)) +
+  geom_line(color = "orange", size = 2, alpha = 0.7) +
+  labs(title = "Count of Tweets by Day",
+       y = "Tweet count",
+       x = "Date") +
+  # theme_minimal() +
+  theme(plot.title.position = "plot",
+        legend.position = "none",
+        axis.line = element_line(size = 1, colour = "grey80"),
+        axis.ticks = element_line(size = 1),
+        axis.text.x = element_text(size=10,color="darkblue"),
+        axis.text.y = element_text(size=10,color="darkblue")) +
+  scale_x_date(date_breaks = "1 day", date_labels = "%b %d")
+ggplotly(p12)
+```
+
+```{r, include=FALSE}
+library(tidytext)
+tweets <- data %>% select(text)
+replace_reg <- "http[s]?://[A-Za-z\\d/\\.]+|&amp;|&lt;|&gt;"
+unnest_reg  <- "([^A-Za-z_\\d#@']|'(?![A-Za-z_\\d#@]))"
+tidy_tweets <- tweets %>%
+  filter(!str_detect(text, "^@")) %>%
+  mutate(text = str_replace_all(text, replace_reg, "")) %>%
+  mutate(id = row_number()) %>%
+  unnest_tokens (
+    word, text, token = "regex", pattern = unnest_reg) %>%
+  filter(!word %in% stop_words$word, str_detect(word, "[a-z]"),
+         !word %in% str_detect(word, "^@"))
+```
+
+### <font size="3">**Most Common Words**</font>
+
+```{r}
+frequency <- tidy_tweets %>%
+  # filter(!word %in% c("@ziplyfiber","ziply")) %>%
+  count(word, sort = TRUE) %>%
+  head(n=20)
+
+p13 <- ggplot(frequency, aes(reorder(word, n), n)) +
+  geom_col(fill = "orange", alpha = 0.7) +
+  xlab('') +
+  ylab('Relative Interest') +
+  coord_flip() +
+  theme(legend.title = element_blank(),
+        legend.position="bottom",
+        legend.text=element_text(size=12),
+        axis.text.x = element_text(size=10,color="darkblue"),
+        axis.text.y = element_text(size=10,color="darkblue")) +
+  ylim(0,NA)
+ggplotly(p13)
+```
+
+News Feeds {data-icon="fa-rss"}
+==================================================
+
+Column
+--------------------------------------------------
+
+### <font size="3">**Ziply In The News**</font>
+
+```{r}
+ziply <- read_html('http://get.ziplyfiber.com/news')
+
+ziply_headlines <- ziply %>%
+  html_nodes(".col-lg-4 .card-body h4") %>%
+  html_text()
+
+news_urls <- ziply %>%
+  html_nodes(".col-lg-4 .card-body .arrow-link-blue.text-link") %>%
+  html_attr("href")
+
+ziply_df <- data.frame(ziply_headlines)
+news_urls <- data.frame(news_urls)
+
+#news_urls$news_urls <- paste0("<a href='",news_urls$news_urls,"'>",news_urls$news_urls,"</a>")
+
+ziply_news <- cbind(ziply_df,news_urls)
+
+renderDT({ 
+ziply_news %>% DT::datatable(
+  #escape = FALSE,
+  colnames = c("News Headline" = "ziply_headlines", "Link to News Story" = "news_urls"),
+  # style = 'bootstrap',
+  rownames = FALSE,
+  options = list(
+        dom = 'Bfrtip',
+        scrollX = TRUE,
+        scrollCollapse = FALSE,
+        pageLength = 25
+  # options = list(
+  #   deferRender = TRUE,
+  #   scrollY = 200,
+  #   scroller = TRUE,
+  #   columnDefs = list(list(className = 'dt-left', targets = '_all'))
+  )
+  )
+}) 
+```
+
+About Report {data-icon="fa-question-circle"}
+==================================================
+
+Column {.tabset}
+-----------------------------------------------------------------------
+
+**WAVE NORTH COMPETITIVE TRACKING TOOL**
+Current Version:  competition_tracker_v0.2.Rmd
