@@ -64,7 +64,7 @@ review <- review %>% filter(created_at>="2021-01-01")
 maxdt <- max(review$created_at)
 loughran_data <- readr::read_csv('loughran.csv')
 afinn_111 <- readxl::read_xlsx('afinn_111.xlsx')
-my_loughran <- loughran_data %>% filter(sentiment %in% c("positive","negative"))
+my_loughran <- loughran_data %>% filter(sentiment %in% c("positive","negative","constraining","litigious"))
 my_lexicon <- afinn_111
 
 review_copy <- review 
@@ -367,7 +367,7 @@ words_by_time <- sd1$data(withSelection = TRUE, withFilter = TRUE) %>%
   mutate(word_total = sum(n)) %>%
   ungroup() %>%
   rename(count = n) %>%
-  filter(word_total>=30)  # nbr of words used at least x times
+  filter(word_total>=20)  # nbr of words used at least x times
 
 shiny::validate(
     shiny::need(nrow(words_by_time) != 0,
@@ -400,7 +400,7 @@ slopes <- nested_models %>%
   mutate(adjusted.p.value = p.adjust(p.value))
 
 top_slopes <- slopes %>%
-  filter(adjusted.p.value<=0.1) %>%
+  filter(adjusted.p.value<=0.05) %>%
   select(-statistic,-p.value)
 
 shiny::validate(
@@ -647,19 +647,20 @@ contributions %>%
 ### <font size="5">**Sentiment Driver Word Cloud**</font>
 ```{r}
 renderPlot({
-  cloud_plot <- sd3$data(withSelection = TRUE, withFilter = TRUE)
+  cloud_plot <- sd3$data(withSelection = TRUE, withFilter = TRUE) 
     
   par(mar=c(.5,.5,.5,.5))
   
   cloud_plot %>%
   inner_join(my_loughran) %>%
   count(word, sentiment, sort = TRUE) %>%
+  mutate(sentiment = toupper(sentiment)) %>%
   acast(word ~ sentiment, value.var = "n", fill = 0) %>%
-  comparison.cloud(title.colors=c("red","green"),
-                   colors = c("red","green"),
+  comparison.cloud(title.colors=c("black","blue","red","green"),
+                   colors = c("black","blue","red","green"),
                    title.bg.colors=c("grey90"),
-                   max.words = 100,
-                   title.size = 5,
+                   max.words = 250,
+                   title.size = 3,
                    scale=c(7,1))
   # comparison.cloud(title.colors=c("green", "orange", "red", "blue", "black"),
   #                  colors = c("green", "orange", "red", "blue", "black"),
@@ -766,10 +767,10 @@ bigram_graph <- bigram_counts %>%
 set.seed(2016)
 par(mar=c(.1,.1,.1,.1))
 a <- grid::arrow(type = "open",
-                 length = unit(.01, "inches"),
+                 length = unit(.03, "inches"),
                  ends = "last")
 ggraph(bigram_graph, layout = "fr") +
-  geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour="royalblue") +
+  geom_edge_link(aes(edge_alpha = n, edge_width = n), edge_colour="blue") +
   geom_node_point(color = "blue", size = 6) +
   geom_node_text(aes(label = name), size=6, vjust = 1, hjust = 1, repel=FALSE, point.padding = unit(0.2, "lines"))
 })
